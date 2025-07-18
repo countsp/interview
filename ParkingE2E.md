@@ -1,0 +1,486 @@
+
+
+# ParkingE2E
+
+### 数据处理流程图
+
+1. 初始化 ParkingDataModuleReal(config, is_train)
+   └─ 设定配置、BOS/EOS/PAD token、相机标签等
+   └─ 调用 create_gt_data()
+2. create_gt_data() 构建训练数据缓存
+   ├─ 调用 get_all_tasks()
+   │   └─ 根据 is_train 决定使用 training_dir / validation_dir
+   │   └─ 遍历目录，收集所有任务路径 task_path
+   ├─ 遍历所有 task_path:
+   │   ├─ 初始化 CameraInfoParser 和 TrajectoryInfoParser
+   │   ├─ 获取相机内参 + 外参 → intrinsic / extrinsic
+   │   └─ 遍历每个时间帧（ego_index）:
+   │       ├─ ego pose ← world 坐标系下
+   │       ├─ 计算 world2ego_mat ← pose 的逆变换
+   │       ├─ create_predict_point_gt()
+   │       │   ├─ 获取多个 future trajectory pose（世界坐标）
+   │       │   ├─ 转为 ego 坐标系
+   │       │   ├─ 编码为 token + pad
+   │       ├─ create_parking_goal_gt()
+   │       │   ├─ 模糊目标点（随机）+ 精确目标点（最终）
+   │       │   ├─ 转为 ego 坐标
+   │       ├─ create_image_path_gt()
+   │       │   └─ 构造图像路径字典：{image_tag: path}
+   │       └─ 保存所有图像路径、位姿、token、目标点信息
+   └─ 调用 format_transform() → 所有 list → numpy 格式缓存
+3. __getitem__(index)
+   ├─ 调用 process_camera(index)
+   │   ├─ 加载 4 张图像（路径来自 self.images[image_tag]）
+   │   ├─ resize → 归一化 → 拼接成一个 tensor（[4C,H,W]）
+   │   ├─ 相机内参和外参也转为 tensor 并拼接
+   └─ 返回字典：
+       {
+         "image": 图像拼接 Tensor,
+         "intrinsics": 相机内参 Tensor,
+         "extrinsics": 相机外参 Tensor,
+         "gt_traj_point": 多步轨迹点（浮点坐标）,
+         "gt_traj_point_token": 多步 token 编码, 
+         "target_point": 精确目标点,
+         "fuzzy_target_point": 模糊目标点
+       }
+4. DataLoader(batch_size, shuffle, num_workers)
+   └─ 自动调用 __getitem__() 并打包为 batch，送入模型
+5. 模型训练接收的 batch 数据：
+   ├─ image: Tensor[B, C*4, H, W]
+   ├─ gt_traj_point: Tensor[B, N*2]
+   ├─ gt_traj_point_token: Tensor[B, token_len]
+   ├─ target_point / fuzzy_target_point: Tensor[B, 2]
+   ├─ intrinsics / extrinsics: Tensor[B, ...]
+
+
+
+## Data
+
+``` 
+batch = next(iter(train_loader))
+```
+
+取出第一个 batch，并打印出结构
+
+```
+  'image': Tensor(shape=(1,4,3,256,256)),
+  'extrinsics': Tensor(shape=(1,4,4,4)),
+  'intrinsics': Tensor(shape=(1,4,3,3)),
+  'target_point': Tensor(shape=(1,2)),
+  'gt_traj_point': Tensor(shape=(1,60)),
+  'gt_traj_point_token': Tensor(shape=(1,63)),
+  'fuzzy_target_point': Tensor(shape=(1,2)),
+```
+
+**image**
+
+- shape `(B, C_cams, C_img, H, W)` = `(1, 4, 3, 256, 256)`
+- 这里 `B=1`，`4` 是四路摄像头（front/left/right/rear），每路 `3` 通道（RGB），分辨率 `256×256`。
+
+**extrinsics**
+
+- shape `(1, 4, 4, 4)`
+- 四路摄像头的 **4×4 齐次外参矩阵**，第一个维度还是 batch。
+
+**intrinsics**
+
+- shape `(1, 4, 3, 3)`
+- 四路摄像头的 **3×3 内参矩阵**。
+
+**target_point**
+
+- shape `(1, 2)`
+- 当前帧的 **精确停车目标点**，格式 `[x, y]`。
+
+**gt_traj_point**
+
+- shape `(1, 60)`
+- 未来 `autoregressive_points * item_number` 个点拼成的回归坐标向量（如 30×2 = 60）。
+
+**gt_traj_point_token**
+
+- shape `(1, 63)`
+- 同样长度的 token 序列（含 BOS/EOS/PAD），长度 = `60 + append_token(3)`。
+
+**fuzzy_target_point**
+
+- shape `(1, 2)`
+- 模糊停车目标点 `[x, y]`。
+
+
+
+# Tokenize
+
+将连续的轨迹点坐标target in ego（如 `(x, y)`）映射为离散的整数 Token。
+
+```
+x_normalize = (x + xy_max) / (2 * xy_max)# 将浮点坐标归一化
+y_normalize = (y + xy_max) / (2 * xy_max)
+
+return [int(x_normalize * valid_token), int(y_normalize * valid_token), int(progress_normalize * valid_token)]#生成整数 Token
+```
+
+valid_token:1200
+
+xy_max:15m
+
+1.25cm分度
+
+
+
+## LSS
+
+self.lss_bev_model(images, intrinsics, extrinsics)
+        ↓
+__call__(...)  # nn.Module 自动定义
+        ↓
+forward(images, intrinsics, extrinsics)
+        ↓
+calc_bev_feature(images, intrinsics, extrinsics)
+        ├── get_geometry(...)       ← 利用相机内外参和 frustum 获取三维坐标
+        ├── encoder_forward(...)    ← EfficientNet将图像编码为特征 + 深度（lift:**真正获取深度**）
+        └── proj_bev_feature(...)   ← 将图像特征投影到 BEV 空间（splat:**把特征撒到 BEV 平面**）
+        ↓
+return bev_feature, pred_depth
+
+#### 功能
+
+显式地编码了像素->空间的映射关系，加速训练收敛
+
+**bev_camera, pred_depth = self.lss_bev_model(images, intrinsics, extrinsics)**  #bev语义特征图 每个深度层的概率分布
+
+**内部：**
+
+1.使用 `EfficientNet` 提取每个相机图像的语义特征和（如果启用）像素级深度分布：
+
+2.使用 `create_frustum()` 得到图像空间中的 3D 采样网格（u, v, d），即为每个像素采样多个深度层。
+
+3.将每个像素点 + 深度点投影到世界坐标系下的 3D 点坐标（通过 `intrinsics`、`extrinsics`）
+
+4.多个相机的所有深度层上每个像素位置对应的特征 `x_b` 被投影到 BEV 网格中。相同 BEV 网格（x, y）上多个相机 / 多个深度层落下来的特征会 **聚合（求和）**
+
+### 具体：LssBevModel
+
+self.frustum = self.create_frustum() # 创建视锥体
+
+self.cam_encoder = CamEncoder(self.cfg, self.depth_channel)  #裁减EfficientNetB0
+
+# Encoder
+
+## Image Encoder
+
+bev_camera_encoder = self.image_res_encoder(bev_camera, flatten=False) 
+
+### BEV encoder
+
+就是经过了resnet18
+
+```
+trunk = resnet18(weights=None, zero_init_residual=True)
+
+self.conv1 = nn.Conv2d(in_channel, 64, kernel_size=7, stride=2, padding=3, bias=False)
+self.bn1 = trunk.bn1
+self.relu = trunk.relu
+self.max_pool = trunk.maxpool
+
+self.layer1 = trunk.layer1
+self.layer2 = trunk.layer2
+self.layer3 = trunk.layer3
+self.layer4 = trunk.layer4
+```
+
+## Target encoder
+
+```
+bev_target = self.get_target_bev(target_point, mode=mode)
+```
+
+计算 BEV 图像大小 h,w -> 初始化空白热力图 (B,1,h,w)  -> 把原点（车头）放到 BEV 图中心 ->除以分辨率 `res` 把米单位转换成网格单位  -> 训练时可加随机偏移（数据增强）->  对每个样本，在以 `(row,col)` 为中心、边长 `2r+1` 的小方块区域内置 `1`，其余保持 `0`。
+
+```
+bev_target_encoder = self.target_res_encoder(bev_target, flatten=False)
+```
+
+## BEV Query 
+
+##### 将两个 BEV 特征进行 Transformer 融合
+
+``` bev_feature = self.get_feature_fusion(bev_target_encoder, bev_camera_encoder)```
+
+即
+
+```bev_feature = self.bev_query(bev_target_encoder, bev_camera_encoder)```
+
+
+
+```bev_feature = self.tf_query(tgt_feature, memory=img_feature)  # Transformer 融合```
+
+执行了：
+
+**自注意力（Self-Attention）**
+
+- 让查询自己内部互相“看”一遍，学习序列内部的依赖。
+
+**跨源注意力（Cross-Attention）**
+
+- 把 `img_feature`（相机 BEV 流程编码的语义空间信息）注入到 `tgt_feature`（目标热力图编码）的表示里。
+
+**前馈网络（Feed-Forward Network）**
+
+- 操作：跨注意力后的每个位置再过两层全连接+激活 (`Linear → GELU/ReLU → Linear`)，增强非线性表达。
+
+**残差 + LayerNorm**
+
+- 每个子层（自注意力、跨注意力、前馈）都有 **残差连接**：输出 = 子层(输入) + 输入
+- 紧跟一个 **LayerNorm**，保持梯度稳定。
+
+**多层堆叠**
+
+- `num_layers=self.cfg.query_en_layers`，就重复上面的流程若干次，让融合更深、更灵活。
+
+
+
+
+
+tgt_feature.shape = (B, C, H, W)
+
+​					|
+
+→ view() 为 (B, C, H*W)
+
+​					|
+
+→ permute → (B, HW, C)
+
+​					|
+
++self.pos_embed 加位置编码
+
+​					|
+
+self.tf_query(tgt_feature, memory=img_feature)   让 `target BEV` 对 `camera BEV` 做多头注意力
+
+​					|
+
+(B, HW, C) → permute → reshape → (B, C, H, W)
+
+
+
+### Trajectory Decoder
+
+```
+def forward(self, encoder_out, tgt):
+# train: (bev_feature, data['gt_traj_point_token'].cuda())
+
+tgt = tgt[:, :-1]  # 去掉最后一个 token（如 EOS），做 teacher forcing
+tgt_mask, tgt_padding_mask = self.create_mask(tgt)
+
+tgt_embedding = self.embedding(tgt)
+
+tgt_embedding = self.pos_drop(tgt_embedding + self.pos_embed)    **先做embedding**
+
+pred_traj_points = self.decoder(encoder_out, tgt_embedding, tgt_mask, tgt_padding_mask)
+```
+
+
+
+对 `tgt_embedding` 做：
+
+1. 自注意力（masked self-attention）
+2. 和 `encoder_out` 做交叉注意力（cross-attention）
+3. 前馈网络（MLP）
+4. 每一层有残差连接和 LayerNorm
+
+
+
+**Teacher Forcing** 是训练序列模型时用真实 token 作为 decoder 的输入（而不是自己预测的），提高训练稳定性。
+
+**假设`gt_traj_point_token` 是：**
+
+```
+[BOS, token1, token2, ..., tokenN, EOS]
+```
+
+你输入 decoder 的是 `tgt[:, :-1] = [BOS, token1, ..., tokenN]`（用作每一步 decoder 输入）
+
+你监督的是 `tgt[:, 1:] = [token1, ..., tokenN, EOS]`（用作目标输出）做 `CrossEntropyLoss`
+
+**推理时不能用 Teacher Forcing**
+
+> 在 `predict()` 阶段，是 auto-regressive 推理，**只能用模型自己前一步的预测作为当前输入**。
+
+你代码中体现：
+
+```
+pred_traj_points = self.output(pred_traj_points)[:, length - offset, :]
+...
+pred_traj_points = torch.softmax(...).argmax(...)  # 自己选 token
+...
+tgt = torch.cat([tgt, pred_traj_points], dim=1)  
+```
+
+### Masking
+
+```
+tgt_mask, tgt_padding_mask = self.create_mask(tgt)
+```
+
+告诉 Transformer 在 attention 时忽略 PAD token 的影响（attention score 不计算）
+
+```
+tgt_padding_mask = [[False, False, True, True]]
+```
+
+告诉 Transformer 在 attention 时忽略 PAD token 的影响（attention score 不计算）
+
+
+
+**Embedding**
+
+embedding 是**一个可学习的、随机初始化的查表式 embedding 层**。不是预训练的 word embedding、也不是 positional embedding、也不是 learned codebook embedding
+
+```
+self.embedding = nn.Embedding(self.cfg.token_nums + self.cfg.append_token, self.cfg.tf_de_dim)
+```
+
+**`nn.Embedding(num_embeddings, embedding_dim)` 的含义：**
+
+| 参数名           | 含义                                                         |
+| ---------------- | ------------------------------------------------------------ |
+| `num_embeddings` | 你希望能嵌入的 token 总数（即词表大小）                      |
+| `embedding_dim`  | 每个 token 对应的嵌入向量维度（即词向量维度）                |
+| 初始化           | 默认是 `torch.nn.init.normal_()` 初始化为正态分布（或可手动修改） |
+| 学习方式         | 参与反向传播，**可训练**                                     |
+
+**Pose embedding**
+
+```
+self.pos_embed = nn.Parameter(torch.randn(1, max_len, hidden_dim) * 0.02)
+```
+
+torch.randn(1, L, D) 对所有元素乘以 0.02，通常用于缩小初始值范围，使训练更稳定。
+
+> shape 为 `[1, L, D]` 的张量会自动在 batch 维度上广播成 `[B, L, D]`，然后与 token embedding 对应位置元素相加。
+
+**注意：**
+
+token embedding 用 nn.Embedding 是因为它本质是“查表”（token id → 向量），而 position embedding 用 nn.Parameter 是因为它是一个固定 shape 的可训练矩阵，直接相加，无需查表。
+
+
+
+## Transformer Decoder
+
+PyTorch 的 `TransformerDecoder` 接收的维度要求是 `[seq_len, batch, dim]`，所以先转置：
+
+```
+encoder_out = encoder_out.transpose(0, 1) 
+tgt_embedding = tgt_embedding.transpose(0, 1)
+```
+
+然后做decoder
+
+```
+pred_traj_points = self.tf_decoder(tgt=tgt_embedding,
+                                        memory=encoder_out,
+                                        tgt_mask=tgt_mask,
+                                        tgt_key_padding_mask=tgt_padding_mask)
+```
+
+其中
+
+```
+self.tf_decoder = nn.TransformerDecoder(tf_layer, num_layers=self.cfg.tf_de_layers)
+```
+
+#### 对 tgt_embedding 进行：
+
+1. Multi-head **self-attention**（带 causal mask）
+2. Multi-head **cross-attention** with **encoder_out**(图像)
+3. FeedForward + LayerNorm 等标准模块
+4. 多层堆叠（`num_layers` 由 config 控制）
+
+输出 shape 同 `tgt_embedding`：`[L, B, D]`
+
+
+
+## 🔍 Learnable Positional Embedding vs Fixed
+
+| 对比项               | Learnable PosEmbed                         | Sinusoidal PosEmbed (Fixed) |
+| -------------------- | ------------------------------------------ | --------------------------- |
+| 是否可训练           | ✅ 是                                       | ❌ 否                        |
+| 表达能力             | 高，自由度大                               | 有一定规律性，适合泛化      |
+| 能否外推长序列       | 不一定好（受限于训练时长度）               | ✅ 可外推（因函数有周期性）  |
+| 用于 NLP/BERT        | ✅ 常见于 BERT、GPT                         | 曾在原始 Transformer 使用   |
+| 用于 Trajectory Task | ✅ 常见（因为轨迹长度固定，不要求泛化长度） | 可选                        |
+
+# 训练结构
+
+在**train.py**中，有
+
+```
+ParkingTrainingModelModule = get_parking_model(data_mode=config_obj.data_mode, run_mode="train") 
+```
+
+在**model_interface.py**中，有
+
+```
+model_class = ParkingTrainingModuleReal
+```
+
+在**trainer_real.py**中，有 
+
+```
+class ParkingTrainingModuleReal(pl.LightningModule):
+    self.parking_model = ParkingModelReal(self.cfg)
+```
+
+在**parking_model_real.py**中，实例化了使用了功能
+
+```
+class ParkingModelReal(nn.Module):
+    self.lss_bev_model = LssBevModel(self.cfg)
+    self.image_res_encoder = BevEncoder(in_channel=self.cfg.bev_encoder_in_channel)
+
+    # Target Encoder
+    self.target_res_encoder = BevEncoder(in_channel=1)
+
+    # BEV Query
+    self.bev_query = BevQuery(self.cfg)
+
+    # Trajectory Decoder
+    self.trajectory_decoder = self.get_trajectory_decoder()
+```
+
+
+
+## 优化
+
+**1.过拟合**
+
+做数据增强（加噪，截断，多场景）
+
+**2.在逼近车位时，预测轨迹偏离**
+
+对 target 通道做高斯分布处理，作为 Encoder 的 Query。
+
+效果：有助于网络学到更精细的侧向定位
+
+
+
+## 为什么用CE？
+
+1. 与 Transformer 自回归框架天然契合
+
+​		Transformer Decoder 原生就是**离散 token 的序列到序列建模**
+
+2. 停车轨迹往往存在多种可行路径（多模态）；回归损失（MSE）假设输出是单峰高斯，容易平均化多种解，结果落在“多种轨迹中间”的不合理位置。
+
+3. 回归 L₂ Loss 对于尺度、单位非常敏感，需要精心调整网络的输出范围、学习率；CE Loss 做分类，logits → softmax → log 概率，一般更容易收敛。
+4. BEV 空间量化成固定网格，token 本身就代表某个格子索引；直接回归到连续坐标就绕过了网格结构，不容易对齐 BEV 特征和模型的输出。
+
+CE LOSS？
+
+l2 distance
+
+hausdorff distance
+
