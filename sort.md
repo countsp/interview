@@ -18,7 +18,7 @@ void quickSort(vector<int>& a, int lo, int hi) {
 
 void quickSort(vector<int>& a) {
     if (!a.empty())
-        quickSort(a, 0, int(a.size()) - 1);
+        quickSort(a, 0, a.size() - 1);
 }
 ```
 
@@ -124,3 +124,5 @@ void mergeSort(vector<int>& a) {
 ​        mergeSort(a, 0, int(a.size()) - 1);
 
 }
+
+ ## quickSort在分块时，不包含mid。但是mergeSort包含。

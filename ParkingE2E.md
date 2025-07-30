@@ -2,6 +2,90 @@
 
 # ParkingE2E
 
+## Trainer
+
+设置训练器 Trainer，包括设备、分布式策略、日志记录、回调、验证频率等
+
+```
+def train(config_obj):
+    parking_trainer = Trainer(callbacks=setup_callbacks(config_obj),
+                              logger=TensorBoardLogger(save_dir=config_obj.log_dir, default_hp_metric=False),
+                              accelerator='gpu',
+                              strategy='ddp' if config_obj.num_gpus > 1 else None,
+                              devices=config_obj.num_gpus,
+                              max_epochs=config_obj.epochs,
+                              log_every_n_steps=config_obj.log_every_n_steps,
+                              check_val_every_n_epoch=config_obj.check_val_every_n_epoch,
+                              profiler='simple')#设置训练器 Trainer，包括设备、分布式策略、日志记录、回调、验证频率等；
+   
+```
+
+定义模型
+
+```
+model = ParkingTrainingModelModule(config_obj) # 实例化模型对象  
+```
+
+加载数据
+
+```
+data = ParkingDataloaderModule(config_obj)
+```
+
+
+
+## 自动调用
+
+下面这几个方法是 PyTorch Lightning 在 `Trainer.fit(…)`／`.validate(…)` 流程中**自动**调用的钩子（hook）方法：
+
+**pl.LightningModule（ParkingTrainingModuleReal）**
+
+- **`__init__`**
+   当你执行 `model = ParkingTrainingModuleReal(cfg)` 时，Python 会调用它来构造对象。
+   Lightning 并不会在运行时再额外调用它。
+- **`configure_optimizers(self)`**
+   在 `Trainer.fit()` 一开始的时候，Lightning 会调用它来从你的模块里拿到：
+  1. 优化器（`optimizer`）
+  2. 学习率调度器（`lr_scheduler`，如果你返回的话）
+- **`training_step(self, batch, batch_idx)`**
+   在每个训练 epoch 中，对每个拿到的训练 batch，Lightning 会自动调用这个方法一次。
+   你在这里实现了前向计算、loss 计算、`self.log_dict({...})` 和返回 loss。
+- **`validation_step(self, batch, batch_idx)`**
+   在每个验证 epoch 中，对每个拿到的验证 batch，Lightning 会自动调用这个方法一次。
+   你在这里算了验证 loss、指标，并 `self.log_dict({...})`。
+
+**pl.LightningDataModule（Dataloader）**
+
+* setup()
+* train_dataloader()
+* val_dataloader()
+
+
+
+## training step
+
+```
+def training_step(self, batch, batch_idx): # automatically processed 
+        loss_dict = {}
+        pred_traj_point, _, _ = self.parking_model(batch)
+
+        train_loss = self.traj_point_loss_func(pred_traj_point, batch)        
+
+        loss_dict.update({"train_loss": train_loss})
+
+        self.log_dict(loss_dict)
+
+        return train_loss
+```
+
+对batch进行推理，输出轨迹
+
+与真值计算loss，返回loss
+
+
+
+
+
 ### 数据处理流程图
 
 1. 初始化 ParkingDataModuleReal(config, is_train)
@@ -461,7 +545,7 @@ class ParkingModelReal(nn.Module):
 
 **2.在逼近车位时，预测轨迹偏离**
 
-对 target 通道做高斯分布处理，作为 Encoder 的 Query。
+对 target 通道做高斯分布处理， BEV 空间对“停车目标点”生成热图，作为 Encoder 的 Query。用 2D 高斯让网络学习不仅知道“在哪儿”，还知道“置信度随着距离衰减”的分布。
 
 效果：有助于网络学到更精细的侧向定位
 

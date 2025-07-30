@@ -43,3 +43,84 @@
 - 在检测到前方障碍物且距离过近时，发布停车命令，保障安全 
 
   ![aw.drawio](/home/office2004/Downloads/aw.drawio.png)
+
+# ekf
+
+
+
+1. 用一个简化的一维 EKF 示例来说明整个“预测 → 测量更新”流程。状态向量取为
+   $$
+   \mathbf x =  \begin{bmatrix} x\\ v \end{bmatrix}
+   $$
+   
+
+   分别表示“位置”和“速度”，并假设：
+
+   - **初始状态**
+     $$
+     x_0 =  \begin{bmatrix}0\,\text{m}\\2\,\text{m/s}\end{bmatrix},\quad P_0 = \begin{bmatrix}1 & 0\\0 & 1\end{bmatrix}
+     $$
+     
+
+   - **过程噪声**
+     $$
+     Q = \begin{bmatrix}0.1 & 0\\0 & 0.1\end{bmatrix}
+     $$
+     
+
+   - **测量噪声**
+
+     - 位置测量方差 R_x = 1
+     - 速度测量方差 Rv=0.5
+
+   - **采样间隔** Δt=1 s
+
+   - **IMU 测得加速度** a=1 m/s2
+
+   - **位置测量（如 NDT 或 GNSS）**  zx=2.6 m
+
+   - **速度测量（如融合后的 Twist）**  zv=2.8 m/s
+
+   ------
+
+   ## 1. 预测（Predict）
+
+   我们采用**匀加速模型**：
+   $$
+   \begin{aligned} x_{k+1|k} &= x_k + v_k\,\Delta t + \tfrac12\,a\,\Delta t^2,\\ v_{k+1|k} &= v_k + a\,\Delta t. \end{aligned}
+   $$
+   
+
+   代入数值：
+   $$
+   \begin{aligned} x_{1|0} &= 0 + 2\cdot1 + 0.5\cdot1\cdot1^2 = 2.5\;\text{m},\\ v_{1|0} &= 2 + 1\cdot1 = 3\;\text{m/s}. \end{aligned}
+   $$
+   
+
+   协方差预测（简化为 P1∣0=P0+QP_{1|0}=P_0+QP1∣0=P0+Q）：
+   $$
+   P_{1|0} =  \begin{bmatrix}1 & 0\\0 & 1\end{bmatrix} + \begin{bmatrix}0.1 & 0\\0 & 0.1\end{bmatrix} = \begin{bmatrix}1.1 & 0\\0 & 1.1\end{bmatrix}
+   $$
+   
+
+   ## 2. 计算卡尔曼增益
+
+   由于测量为“位置”和“速度”两条独立观测，增益可分开计算：
+   $$
+   \begin{aligned} K_x &= \frac{P_{1|0}(1,1)}{P_{1|0}(1,1) + R_x}   = \frac{1.1}{1.1 + 1} \approx 0.524,\\ K_v &= \frac{P_{1|0}(2,2)}{P_{1|0}(2,2) + R_v}      = \frac{1.1}{1.1 + 0.5} \approx 0.6875. \end{aligned}
+   $$
+   
+
+   ## 3. 测量更新（Measurement Update）
+
+   分别对位置和速度做校正：
+   $$
+   \begin{aligned} x_{1|1}  &= x_{1|0} + K_x\bigl(z_x - x_{1|0}\bigr) = 2.5 + 0.524\,(2.6 - 2.5) \approx 2.5 + 0.0524 = 2.5524,\\ v_{1|1}  &= v_{1|0} + K_v\bigl(z_v - v_{1|0}\bigr) = 3 + 0.6875\,(2.8 - 3) \approx 3 - 0.1375 = 2.8625. \end{aligned}
+   $$
+   
+
+   更新后的协方差：
+   $$
+   \begin{aligned} P_{1|1}(1,1) &= (1 - K_x)\,P_{1|0}(1,1)              = (1 - 0.524)\times1.1 \approx 0.524,\\ P_{1|1}(2,2) &= (1 - K_v)\,P_{1|0}(2,2)              = (1 - 0.6875)\times1.1 \approx 0.3438. \end{aligned}
+   $$
+   

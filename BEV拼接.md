@@ -1,5 +1,47 @@
 # BEV拼接
 
+## 1. 初始化（构造函数里完成）
+
+1. **加载权重图**
+   - 从本地 PNG 读入 4 路预先计算好的融合权重 `weight_map0–3.png`，上传到 GPU，并算出 `1–G`，供后续加权融合用。
+2. **加载车辆中间图**
+   - 把车顶遮挡图 `car.png` 读入并 resize，最终在拼接中心区域叠上去。
+3. **标定与映射矩阵准备**
+   - 读入四路相机的内参 `cameraMatrix_*`、畸变系数 `distCoeffs_*` 及透视投影矩阵 `projectMatrix_*`。
+   - 根据经验的缩放和平移参数对新的内参做 scale & shift，调用 `cv::fisheye::initUndistortRectifyMap` 生成去畸变的映射 `map1/map2` 并上传到 GPU。
+4. **ROS 接入**
+   - 订阅四路原始鱼眼话题 `/cam4…/cam7`，发布中间针孔图像话题和最终 BEV `/driver/fisheye/avm`。
+
+------
+
+## 2. 数据流与回调
+
+每当某一路相机回调触发（`callbackBack/Right/Front/Left`）时，分别执行：
+
+1. **下载到 GPU**：`d_frame_*.upload(cpu_mat)`
+2. **CUDA 去畸变**：`cv::cuda::remap` + `warpPerspective`（鸟瞰投影到平面）
+3. **旋转对齐**（前后只需 warpPerspective，左右和右视调用 `warpAffine` 用自定义 2×3 矩阵做 90° 旋转）
+4. **打标就绪**：将处理后的 GPU 图像 (`d_fb/d_fr/d_ff/d_fl`) 标记为「可发布」
+5. **同步发布**：当四路图像都到达后（四个布尔 flag 全真），触发一次完整拼接与发布
+
+------
+
+## 3. 拼接与融合（`stitch_all_parts_cuda`）
+
+1. **裁剪中心块**：从每路投影图上用 ROI 剪出中间不重叠区（`FM/BM/LM/RM_CUDA`）。
+2. **并行加权融合**：对 4 条重叠缝（前–左、前–右、后–左、后–右）各自调用 `mergeGPU`：
+   - 在 CUDA 上把 `imA, imB` 转为浮点 `[0,1]`，与预载的权重图 `G` 和 `1–G` 做逐元素 `multiply`、`add`，再转回 8U。
+   - 4 条缝用不同 `cuda::Stream` 异步执行，并在最后 `waitForCompletion`。
+3. **大图布局**：根据裁剪后各块大小，在一个预先 `create(总高,总宽)` 的大 GpuMat 上用 `copyTo(rect)` 依次拷贝
+   - 左上 (`d_FL`)、中上 (`d_F`)、右上 (`d_FR`)
+   - 左中 (`d_L`)、中心车顶 (`car_image`)、右中 (`d_R`)
+   - 左下 (`d_BL`)、中下 (`d_B`)、右下 (`d_BR`)
+4. **性能统计**：用 ROS 时间戳打印各阶段耗时（remap/warp/merge/copyTo）。
+
+---
+
+
+
 **生成重叠区域掩码 `overlapMask`**
 
 ```
@@ -17,7 +59,7 @@ indices = np.where(overlapMask == 255)
 **提取边界用的差异图像**
 
 ```
-pythonCopyEditimA_diff = cv2.bitwise_and(imA, imA, mask=overlapMaskInv)
+imA_diff = cv2.bitwise_and(imA, imA, mask=overlapMaskInv)
 imB_diff = cv2.bitwise_and(imB, imB, mask=overlapMaskInv)
 ```
 
@@ -195,7 +237,53 @@ R = adjust_luminance(R, c3)
 
 # 难点
 
-OpenCV CUDA 模块里**并没有**像 CPU 端 `cv::rotate` 那样的专用 `rotate` 函数；要在 GPU 上做旋转，一般就是走仿射变换——也就是用 `cv::cuda::warpAffine` 配合一个旋转矩阵来实现。
+1.**全流程 GPU 加速**
+
+- 从畸变校正、鸟瞰投影、旋转对齐，到加权融合、拼接拷贝，全都在 CUDA 上完成，仅在最终一步下载。
+- 异步 `cuda::Stream` 并行处理 4 条融合缝，大幅提升实时性。
+
+```
+cv::cuda::Stream s_back, s_right, s_front, s_left;
+		auto d_FL = mergeGPU(FI_CUDA(d_front), LI_CUDA(d_left),   0, s_back);
+        auto d_FR = mergeGPU(FII_CUDA(d_front), RII_CUDA(d_right), 1, s_right);
+        auto d_BL = mergeGPU(BIII_CUDA(d_back), LIII_CUDA(d_left),  2, s_front);
+        auto d_BR = mergeGPU(BIV_CUDA(d_back), RIV_CUDA(d_right),   3, s_left);
+        
+        s_back.waitForCompletion();
+        s_right.waitForCompletion();
+        s_front.waitForCompletion();
+        s_left.waitForCompletion();
+```
+
+
+
+在 CUDA 中，流就是一条“命令流水线”——你往流里提交内存拷贝、核函数（kernel）调用、事件（Event）等操作，它们会**按提交顺序**在 GPU 上执行。如果不指定流，所有操作都提交到默认流（0 号流），在该流里所有操作严格串行。
+
+**流内：串行执行**
+
+```
+cudaMemcpyAsync(..., stream);
+kernel<<<..., ..., 0, stream>>>(...);
+cudaMemcpyAsync(..., stream);
+```
+
+**流间：可并行**
+
+```
+cudaMemcpyAsync(src1, dst1, ..., streamA);
+kernelA<<<…,0,0,streamA>>>(...);
+
+cudaMemcpyAsync(src2, dst2, ..., streamB);
+kernelB<<<…,0,0,streamB>>>(...);
+```
+
+**每个流背后在 CUDA 驱动层维护一个队列，队列中是打包好的二进制命令封包（指令块）。**
+
+
+
+
+
+**2.OpenCV CUDA 模块里并没有像 CPU 端 `cv::rotate` 那样的专用 `rotate` 函数；要在 GPU 上做旋转，一般就是走仿射变换——也就是用 `cv::cuda::warpAffine` 配合一个旋转矩阵来实现。**
 
 ```
 cv::Point2f center( cx, cy );       // 旋转中心
@@ -359,3 +447,26 @@ cv::cuda::warpAffine(
 
 - 抽象拼接流程，把“前”、“后”、“左”、“右”推广成 N 边多边形环结构，对相邻两路统一调用同样的 `get_weight_mask_matrix`、`stitch` 接口。
 - 在权重计算中引入学习式 UAV 拼接网络，根据实际环境自适应调整权重分布，提升雨雪、低光场景下的拼接质量。
+
+---
+
+
+
+### 硬件：
+
+GPU包括：
+
+**ALU：**经过模块化设计、能高效完成加减、位移、逻辑运算等功能的组合电路。
+
+**Tensor Core：** GPU 上的专用计算单元，但它并不是简单的“门电路组合”去做通用算术，而是专门针对小块矩阵的大规模乘加（Matrix Multiply–Accumulate, MMA）操作做了**硬件级融合**和**流水线优化**。每个 Tensor Core 原生支持一条 **4×4×4** 的半精度矩阵乘加
+
+**拷贝引擎：**通过 PCIe（或 NVLink）总线，把主机内存的数据异步拷到 GPU 显存，或把显存数据拷回主机。大多数 NVIDIA GPU 上有**两个**独立的拷贝引擎：
+
+- 一个专门做 H2D（Host→Device）
+- 一个专门做 D2H（Device→Host）
+
+使用时：
+
+**小规模或任意并行任务** → ALU。
+
+**大规模、对齐到硬件 Tile 的矩阵乘加** → Tensor Core（前提是数据类型和调用接口都支持）。
