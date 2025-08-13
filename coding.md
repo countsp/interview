@@ -1,5 +1,7 @@
 # coding
-**NMS**
+Multihead attention手撕
+二维平面上多个矩形求并集面积
+**IOU/NMS**
 
 坐标格式要提前约定（xyxy/cxcywh），若是后者先转成 xyxy。
 
@@ -66,3 +68,23 @@ def nms_per_class(boxes, scores, labels, iou_thr=0.5):
     # 可按分数再整体排序
     return sorted(keep_all, key=lambda i: scores[i], reverse=True)
 ```
+**Softmax**
+```
+import math
+
+def softmax(x):
+    """
+    x: 一维列表或数组
+    """
+    # 防止溢出：减去最大值
+    max_val = max(x)
+    exps = [math.exp(i - max_val) for i in x]
+    sum_exps = sum(exps)
+    return [e / sum_exps for e in exps]
+
+# 测试
+scores = [2.0, 1.0, 0.1]
+print("Softmax:", softmax(scores))
+```
+
+这样所有 $x_i - m \le 0$，指数不会爆炸，同时结果完全不变（因为分子分母同时乘上了 $e^{-m}$ 被约掉）。
