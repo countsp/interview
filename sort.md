@@ -126,3 +126,4 @@ void mergeSort(vector<int>& a) {
 }
 ```
  ## quickSort在分块时，不包含mid。但是mergeSort包含。
+ ## mergesort不要忘记恢复到原始数据中。
