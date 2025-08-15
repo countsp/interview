@@ -1,6 +1,107 @@
 
 
 # ParkingE2E
+## 为什么用Efficientnet
+
+**大小：**
+
+1.**EfficientNet** 用了 **MBConv + SE + Swish** 等结构，在**同等精度下计算量更低**，同时保留较强的感受野与特征表达能力
+
+2.LSS 是一个**多相机输入、多尺度推理**的结构（6~8 路相机），如果 backbone 太重（如 ResNet101），GPU 显存和延迟都会炸掉
+
+**功能**：
+
+3.抑制无用通道，强化关键信号
+
+- MBConv + SE 会让网络更关注有用通道，小目标、远距纹理细节会保留更多。MBConv 生成了很多种通道特征，SE 让网络能**根据当前图片的整体特征分布**，动态选择最有用的那几个通道来突出
+- 这对 LSS 特别重要，因为远处目标在图像里只有几像素大，特征稍微被平滑掉就无法在 BEV 空间还原
+
+---
+
+
+
+### EfficientNet
+
+**1.升维 Expansion：**
+
+1×1 Conv（扩展）: Cin → Cin × t =Cexp
+
+```
+nn.Conv2d(16, 96, kernel_size=1, bias=False),
+```
+
+**提升特征维度：**提供更多中间特征组合，增加表达能力。
+
+**增强 depthwise 卷积效果： **depthwise 不处理通道间信息，扩展后能处理更细致的局部空间特征
+
+​		│
+​       ▼
+
+（BatchNorm + Swish）
+
+```
+nn.BatchNorm2d(96)
+nn.SiLU()
+```
+
+​       │
+
+​       ▼
+
+2.**深度可分离卷积：**
+
+每个通道单独使用一个卷积核进行卷积，**大大减少参数量和计算量**。
+
+​		│
+​       ▼
+
+（BatchNorm + Swish）
+
+​       │
+
+​       ▼
+
+3.**SE 模块（Squeeze-and-Excitation）**：
+
+提炼 + 降低参数量 & 计算量 ( 16 * 16-> 4 * 16 * 2)
+
+​			**Squeeze（压缩）**：全局平均池化，对每个通道压缩成一个标量
+
+​			**Excitation（激励）**：通过一个两层 MLP 生成每个通道的权重
+
+​			**Scale（重标定）**：用这些权重乘以原特征图，实现通道注意力
+
+**用 `Sigmoid` 的输出（通道注意力权重）去“缩放”输入特征图的每一个通道**。
+
+```
+class SEModule(nn.Module):
+    def __init__(self, channels, reduction=4):
+        super().__init__()
+        self.pool = nn.AdaptiveAvgPool2d(1)  # 输出 (B, C, 1, 1)
+        self.fc1 = nn.Linear(channels, channels // reduction, bias=True) 16->4
+        self.fc2 = nn.Linear(channels // reduction, channels, bias=True) 4->16
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        b, c, _, _ = x.shape
+        y = self.pool(x).view(b, c)           # (B, 16)
+        y = self.relu(self.fc1(y))            # (B, 4)
+        y = self.sigmoid(self.fc2(y))         # (B, 16)
+        y = y.view(b, c, 1, 1)                # (B, C, 1, 1)
+        return x * y                          # ✅ ← 关键：x * attention（通道加权）
+```
+
+**4.Project**
+
+````
+nn.Conv2d(96, 24, kernel_size=1, bias=False),
+nn.BatchNorm2d(24)
+````
+
+**5.Residual**
+
+保留原信息，提升梯度流动
 
 ## Trainer
 
@@ -81,6 +182,20 @@ def training_step(self, batch, batch_idx): # automatically processed
 对batch进行推理，输出轨迹
 
 与真值计算loss，返回loss
+
+
+输入:  [BOS, 5, 9, 4, 2]  # L-1 个token
+
+输出:  [p(5|BOS), p(9|BOS,5), p(4|BOS,5,9), p(2|BOS,5,9,4), p(EOS|BOS,5,9,4,2)]
+
+GT:    [   5   ,     9     ,    4         ,   2           ,       EOS          ]
+
+```
+pred = pred[:, :-1, :]   #因为最后一个没有gt
+
+gt   = data[:, 1:-1]  
+```
+
 
 
 
