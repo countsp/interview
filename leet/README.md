@@ -30,12 +30,59 @@ public:
 # 49. 字母异位词分组
 
 给你一个字符串数组，请你将 字母异位词 组合在一起。可以按任意顺序返回结果列表。
-
-
-
+```
+class Solution {
+public:
+    vector<vector<string>> groupAnagrams(vector<string>& strs) {
+        vector<vector<string>>ans;
+        unordered_map<string,vector<string>> mp;
+        for(string str:strs)
+        {   string temp = str;
+            sort(temp.begin(),temp.end());
+            mp[temp].push_back(str);
+        }
+        for(auto it:mp)
+        {
+            ans.push_back(it.second);
+        }
+    return ans;
+    }
+};
+```
+1. 异位词的特性就是sort后相同，归纳到一类的话用unordered_map.
+2. unordered_map遍历用 for auto v:mp ,取value 用 v.second, 不是v.second()
 
 ---
 
+# 128. 最长连续序列
+
+给定一个未排序的整数数组 nums ，找出数字连续的最长序列（不要求序列元素在原数组中连续）的长度。
+
+请你设计并实现时间复杂度为 O(n) 的算法解决此问题。
+
+```
+class Solution {
+public:
+    int longestConsecutive(vector<int>& nums) {
+        unordered_set<int> s(nums.begin(),nums.end());
+        int ans=0;
+        for(auto i:s)
+        {
+            if(s.count(i-1)){continue;}
+            else{
+                int cnt = 0; int curr = i;
+                while(s.count(curr++)){cnt++;ans = max(ans,cnt);}
+            }
+        }
+    return ans;
+    }
+};
+```
+
+1. 如果数字连续，判断是不是开头。
+
+2. 用set去重并且o(1)找到。
+ 
 # 94
 给定一个二叉树的根节点 root ，返回 它的 中序 遍历 。
 
