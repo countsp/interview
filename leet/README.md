@@ -82,7 +82,94 @@ public:
 1. 如果数字连续，判断是不是开头。
 
 2. 用set去重并且o(1)找到。
- 
+
+---
+
+# 83.移动零
+给定一个数组 nums，编写一个函数将所有 0 移动到数组的末尾，同时保持非零元素的相对顺序。
+
+请注意 ，必须在不复制数组的情况下原地对数组进行操作。
+
+```
+class Solution {
+public:
+    void moveZeroes(vector<int>& nums) {
+        int ins = 0;
+        for(int i=0;i<nums.size();++i)
+        {
+            if(nums[i]!=0)
+            {
+                swap(nums[ins++],nums[i]);
+            }
+        }
+    }
+};
+```
+1.不是零的放前面，零自动放后面了，同时保证顺序。
+
+---
+
+# 11. 盛最多水的容器
+
+给定一个长度为 n 的整数数组 height 。有 n 条垂线，第 i 条线的两个端点是 (i, 0) 和 (i, height[i]) 。
+
+找出其中的两条线，使得它们与 x 轴共同构成的容器可以容纳最多的水。
+
+返回容器可以储存的最大水量。
+
+说明：你不能倾斜容器。
+
+```
+class Solution {
+public:
+    int maxArea(vector<int>& height) {
+        int l = 0,r = height.size()-1; int ans = 0;
+        while(l<r)
+        {
+            ans = max(ans, min(height[r],height[l])*(r-l));
+            if(height[l]>height[r])r--;
+            else {l++;}
+        }
+    return ans;
+}
+};
+```
+1.循环中不要同时进入两个if
+
+---
+
+# 15.三数之和
+给你一个整数数组 nums ，判断是否存在三元组 [nums[i], nums[j], nums[k]] 满足 i != j、i != k 且 j != k ，同时还满足 nums[i] + nums[j] + nums[k] == 0 。请你返回所有和为 0 且不重复的三元组。
+
+注意：答案中不可以包含重复的三元组。
+
+```
+class Solution {
+public:
+    vector<vector<int>> threeSum(vector<int>& nums) {
+        vector<vector<int>> ans;
+        
+        sort(nums.begin(),nums.end());
+        for(int l =0;l<nums.size()-2;++l)
+        {
+            int mid = l+1; int r = nums.size()-1; int sum = -nums[l];
+            while(mid<r)
+            {   while(mid)
+                if(nums[mid]+nums[r] == sum)
+                    {ans.push_back({nums[l],nums[mid],nums[r]});mid++;r--;while(mid<r && nums[mid]==nums[mid-1]) {mid++;} while(mid<r && nums[r]==nums[r+1]) {r--;}}
+                else if(nums[mid]+nums[r] > sum){r--;}
+                else if(nums[mid]+nums[r] < sum){mid++;}
+                
+                
+            }
+        }
+    return ans;
+}
+};
+```
+
+---
+
 # 94
 给定一个二叉树的根节点 root ，返回 它的 中序 遍历 。
 
