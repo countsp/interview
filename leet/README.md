@@ -194,6 +194,74 @@ public:
 # 42.接雨水
 给定 n 个非负整数表示每个宽度为 1 的柱子的高度图，计算按此排列的柱子，下雨之后能接多少雨水。
 
+```
+class Solution {
+public:
+    int trap(vector<int>& height) {
+        
+        vector<int> left_max(height.size(),0);
+        vector<int> right_max(height.size(),0);
+        int ans = 0;
+
+        int l_max = 0,r_max = 0;
+
+        for(int i =0;i<height.size();++i)
+        {   
+            l_max=max(l_max,height[i]);
+            left_max[i]=l_max;
+        }
+
+        for(int j =height.size()-1;j>=0;--j)
+        {   
+            r_max=max(r_max,height[j]);
+            right_max[j]=r_max;
+        }
+
+        for(int i =0;i<height.size();++i)
+        {   
+            ans+= min(left_max[i],right_max[i])-height[i];
+
+        }
+    return ans;
+    }
+};
+```
+
+1.vector<int>v (nums,a)表示初始化nums个a
+
+2.当前能盛水高度 = 左右最大值中的最小的一个-当前高度 ->从左遍历 从右遍历
+
+---
+
+# 3. 无重复字符的最长子串
+给定一个字符串 s ，请你找出其中不含有重复字符的 最长 子串 的长度。
+
+```
+class Solution {
+public:
+    int lengthOfLongestSubstring(string s) {
+        int n = s.size();if(n==0)return 0 ;
+        int ans = 0;
+        unordered_map<int,int> mp;
+        int l = 0;
+        for(int r =0;r<n;++r)
+        {
+            auto it= mp.find(s[r]-'a');
+            if(it!= mp.end() && it->second>=l) {l=it->second+1;}
+
+            mp[s[r]-'a']=r;
+            ans =max(ans,r-l+1);
+        }
+    return ans;
+}
+};
+```
+
+1.用l表示边界，r表示目前看的字符
+
+2.新增值在窗内就更新l，否则就更新r
+
+3.每次都计算窗是不是最大？
 
 ---
 
