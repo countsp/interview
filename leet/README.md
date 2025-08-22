@@ -144,29 +144,56 @@ public:
 注意：答案中不可以包含重复的三元组。
 
 ```
+#include <vector>
+#include <algorithm>
+using namespace std;
+
 class Solution {
 public:
     vector<vector<int>> threeSum(vector<int>& nums) {
         vector<vector<int>> ans;
-        
-        sort(nums.begin(),nums.end());
-        for(int l =0;l<nums.size()-2;++l)
-        {
-            int mid = l+1; int r = nums.size()-1; int sum = -nums[l];
-            while(mid<r)
-            {   while(mid)
-                if(nums[mid]+nums[r] == sum)
-                    {ans.push_back({nums[l],nums[mid],nums[r]});mid++;r--;while(mid<r && nums[mid]==nums[mid-1]) {mid++;} while(mid<r && nums[r]==nums[r+1]) {r--;}}
-                else if(nums[mid]+nums[r] > sum){r--;}
-                else if(nums[mid]+nums[r] < sum){mid++;}
-                
-                
+        sort(nums.begin(), nums.end());
+        int n = nums.size();
+
+        for (int l = 0; l < n - 2; ++l) {
+            if (l > 0 && nums[l] == nums[l - 1]) continue; // 去重 l
+            if (nums[l] > 0) break;                         // 剪枝
+
+            int mid = l + 1, r = n - 1;
+            int target = -nums[l];
+            while (mid < r) {
+                int s = nums[mid] + nums[r];
+                if (s == target) {
+                    ans.push_back({nums[l], nums[mid], nums[r]});
+                    ++mid; --r;
+                    while (mid < r && nums[mid] == nums[mid - 1]) ++mid; // 去重 mid
+                    while (mid < r && nums[r] == nums[r + 1]) --r;       // 去重 r
+                } else if (s < target) {
+                    ++mid;
+                } else {
+                    --r;
+                }
             }
         }
-    return ans;
-}
+        return ans;
+    }
 };
+
 ```
+
+1.用for确定left，while在mid和right中迭代
+
+2.锁定一组后也要更新mid 和 right
+
+3.外层去重：在进入双指针之前就做：if (l>0 && nums[l]==nums[l-1]) continue;
+
+4.内层去重：这一步是在“锁定一组解”后去掉与这组解数值完全相同的其它组合，防止重复输出。
+
+---
+
+# 42.接雨水
+给定 n 个非负整数表示每个宽度为 1 的柱子的高度图，计算按此排列的柱子，下雨之后能接多少雨水。
+
 
 ---
 
