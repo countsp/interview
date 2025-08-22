@@ -264,6 +264,36 @@ public:
 3.每次都计算窗是不是最大？
 
 ---
+# 438. 找到字符串中所有字母异位词
+给定两个字符串 s 和 p，找到 s 中所有 p 的 异位词 的子串，返回这些子串的起始索引。不考虑答案输出的顺序。
+
+```
+class Solution {
+public:
+    vector<int> findAnagrams(string s, string p) {
+        int s_len = s.size(),p_len = p.size();
+        unordered_map<int,int>mp,cor;
+        for(int l=0;l<p_len;++l)
+        {
+            cor[p[l]]++;
+        }
+
+        for(int r=0;r<p_len;++r)
+        {   if(r<p_len)
+            mp[s[r]-'a']++;
+            else
+            {
+                mp[s[r-p]-'a']--;
+                mp[s[r]-'a']++;
+            }
+        if(cor == mp)
+        {ans.push_back(s.substr())}    
+        }
+    }
+};
+```
+
+---
 
 # 94
 给定一个二叉树的根节点 root ，返回 它的 中序 遍历 。
