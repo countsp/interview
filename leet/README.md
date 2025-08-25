@@ -507,6 +507,163 @@ public:
 
 请你实现时间复杂度为 O(n) 并且只使用常数级别额外空间的解决方案。
 
+---
+
+# 73. 矩阵置零
+
+给定一个 m x n 的矩阵，如果一个元素为 0 ，则将其所在行和列的所有元素都设为 0 。请使用 原地 算法。
+
+```
+class Solution {
+public:
+    void setZeroes(vector<vector<int>>& matrix) {
+        bool firstr =false,firstc= false;
+        int m= matrix.size(),n=matrix[0].size();
+        for(int i = 0;i<m;++i) {if (matrix[i][0]==0){firstc =true;break;}}
+        for(int j = 0;j<n;++j) {if (matrix[0][j]==0){firstr =true;break;}} 
+        
+        for(int i = 1;i<m;++i)
+        {
+            for(int j = 1;j<n;++j)
+                {
+                    if (matrix[i][j]==0)
+                    {
+                        matrix[i][0]=0;
+                        matrix[0][j]=0;
+
+                    }
+                }
+        }
+
+        for(int i = 1;i<m;++i){
+            if(matrix[i][0]==0)
+            {
+                for(int j = 0;j<n;++j)
+                {matrix[i][j]=0;}
+            }
+        }
+        for(int j = 1;j<n;++j){
+            if(matrix[0][j]==0)
+            {
+                for(int i = 0;i<m;++i)
+                {matrix[i][j]=0;}
+            }
+        }
+        if (firstc){
+            for(int i = 0;i<m;++i)
+             {matrix[i][0]=0;}
+        }
+       
+       if (firstr){
+            for(int j = 0;j<n;++j)
+             {matrix[0][j]=0;}
+        }
+
+    }
+};
+```
+
+1.判断第一行/第一列是否有0，保存为两个值
+
+2.判断每一行/每一列是否有0，如果有就将行首/列首元素置为0
+
+---
+
+# 54. 螺旋矩阵
+
+给你一个 m 行 n 列的矩阵 matrix ，请按照 顺时针螺旋顺序 ，返回矩阵中的所有元素。
+
+```
+class Solution {
+public:
+    vector<int> spiralOrder(vector<vector<int>>& matrix) {
+        int m = matrix.size();
+        int n = matrix[0].size();
+        vector<int>ans;
+        int l=0,r=n-1,t=0,b=m-1;
+
+        while(l<=r && t<=b)
+        {
+            for(int i = l; i<=r; ++i){ans.push_back(matrix[t][i]);}t++;
+
+            for(int i = t; i<=b; ++i){ans.push_back(matrix[i][r]);}r--;
+        
+            if(l<=r && t<=b){
+                for(int i = r; i>=l ; --i){ans.push_back(matrix[b][i]);}
+            }b--;
+            if(l<=r && t<=b){
+                for(int i = b; i>=t ; --i){ans.push_back(matrix[i][l]);}
+            }l++;
+        }
+    return ans;
+    }
+};
+```
+easy题目
+
+1.第三段、第四段前，因为收缩过，所以要重新判断满足条件。
+
+2. ++操作在括号外；
+
+---
+
+# 48.旋转图像
+给定一个 n × n 的二维矩阵 matrix 表示一个图像。请你将图像顺时针旋转 90 度。
+
+你必须在 原地 旋转图像，这意味着你需要直接修改输入的二维矩阵。请不要 使用另一个矩阵来旋转图像。
+
+```
+class Solution {
+public:
+    void rotate(vector<vector<int>>& matrix) {
+        for(int i =0;i<matrix.size()-1;++i)
+        {
+            for(int j= i+1; j<matrix.size(); ++j)
+            {
+                swap(matrix[i][j],matrix[j][i]);
+            }
+        }
+
+        for(int i =0;i<matrix.size();++i)
+        {
+            for(int j= 0; j<matrix.size()/2; ++j)
+            {
+                swap( matrix[i][j] , matrix[i][matrix.size()-1-j] );
+            }
+        }
+    }
+};
+```
+1.旋转 = 转置 + 左右对称
+
+---
+# 240. 搜索二维矩阵 II
+编写一个高效的算法来搜索 m x n 矩阵 matrix 中的一个目标值 target 。该矩阵具有以下特性：
+
+每行的元素从左到右升序排列。
+每列的元素从上到下升序排列。
+
+```
+class Solution {
+public:
+    bool searchMatrix(vector<vector<int>>& matrix, int target) {
+        int m = matrix.size();
+        int n = matrix[0].size();
+        int i = m-1;
+        int j = 0;
+        while (i>=0&& j <n)
+        {   if(matrix[i][j]==target){return true;}
+            else if(matrix[i][j]<target){j++;}
+            else {i--;}
+        }
+    return false;
+    }
+};
+```
+easy
+
+1.从左下开始，大于当前，排除本行，小于当前，排除本列；
+
 
 # 94
 给定一个二叉树的根节点 root ，返回 它的 中序 遍历 。
