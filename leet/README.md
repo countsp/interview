@@ -272,28 +272,241 @@ class Solution {
 public:
     vector<int> findAnagrams(string s, string p) {
         int s_len = s.size(),p_len = p.size();
-        unordered_map<int,int>mp,cor;
+        vector<int> ans;
+        vector<int>mp(26,0),cor(26,0);
         for(int l=0;l<p_len;++l)
         {
-            cor[p[l]]++;
+            cor[p[l]-'a']++;
         }
 
-        for(int r=0;r<p_len;++r)
+        for(int r=0;r<s_len;++r)
         {   if(r<p_len)
             mp[s[r]-'a']++;
             else
             {
-                mp[s[r-p]-'a']--;
+                mp[s[r-p_len]-'a']--;
                 mp[s[r]-'a']++;
             }
-        if(cor == mp)
-        {ans.push_back(s.substr())}    
+            if(cor == mp)
+            {ans.push_back(r-p_len+1);}  
+        }   
+    return ans;
+}
+    
+};
+```
+1. 用 数量来做，unordered_map<int,int> 比较 mp == cor，但窗口滑出时没有把计数为 0 的键删掉，if (--win[key] == 0) win.erase(key);
+
+2. 要么用两个vector计数，初始化26个'0'
+
+
+---
+
+# 560. 和为 K 的子数组
+给你一个整数数组 nums 和一个整数 k ，请你统计并返回 该数组中和为 k 的子数组的个数 。
+
+子数组是数组中元素的连续非空序列。
+
+```
+class Solution {
+public:
+    int subarraySum(vector<int>& nums, int k) {
+        unordered_map<long long,int>mp;
+        long long sum=0;
+        int ans = 0;
+        mp[0] = 1;
+        for(int i=0;i<nums.size();++i)
+        {
+            sum = sum + nums[i];
+
+            if(mp.count(sum-k)){ans+=mp[sum-k];}
+            mp[sum]++;
+
         }
+    return ans;
+}
+};
+```
+
+1.看到计算子数组和，就是计算0～末尾 - 0～起始
+
+2.用map的key做sum，作value : unordered_map<long long, int> cnt; // 前缀和 -> 出现次数
+
+---
+
+# *239. 滑动窗口最大值
+
+给你一个整数数组 nums，有一个大小为 k 的滑动窗口从数组的最左侧移动到数组的最右侧。你只可以看到在滑动窗口内的 k 个数字。滑动窗口每次只向右移动一位。
+
+返回 滑动窗口中的最大值 。
+
+```
+class Solution {
+public:
+    vector<int> maxSlidingWindow(vector<int>& nums, int k) {
+        int n = nums.size();
+        if (n == 0 || k == 0) return {};
+
+        deque<int>dq;vector<int>ans;
+        for(int i=0;i<nums.size();++i)
+        {   
+            while(!dq.empty() && dq.front()<=i-k){dq.pop_front();}
+
+            while(!dq.empty() && nums[dq.back()]<=nums[i]){dq.pop_back();}    
+
+            dq.emplace_back(i);
+
+            if(i>=k-1)ans.push_back(nums[dq.front()]);
+        }
+    return ans;  
+    }
+};
+```
+记住：
+
+1.看到滑动窗口最大值，用双端队列deque，保存下标。并保持对应的值从队头到队尾递减。
+
+2.维护递减性：当 dq 尾部对应的值 <= nums[i]，从队尾弹出，直到队列递减。
+
+3.把当前下标 i 压入队尾。
+
+4.当形成完整窗口（i >= k-1）时，答案加入 nums[dq.front()]（此时队头就是窗口最大值）。
+
+---
+
+# 76. 最小覆盖子串
+
+给你一个字符串 s 、一个字符串 t 。返回 s 中涵盖 t 所有字符的最小子串。如果 s 中不存在涵盖 t 所有字符的子串，则返回空字符串 "" 。
+
+```
+！！！！
+```
+---
+
+# 53. 最大子数组和
+给你一个整数数组 nums ，请你找出一个具有最大和的连续子数组（子数组最少包含一个元素），返回其最大和。
+
+子数组是数组中的一个连续部分。
+
+```
+class Solution {
+public:
+    int maxSubArray(vector<int>& nums) {
+        int curr = 0;
+        int ans = -INT_MAX;
+        for(int i = 0;i<nums.size();++i)
+        {
+            curr = max(curr+nums[i],nums[i]);
+            ans = max(curr,ans);
+        }
+    return ans;
+}
+};
+```
+
+1.明显用dp，当前表示子数组的末尾。
+
+2.最大值为INT_MAX;
+
+---
+
+# 56. 合并区间
+
+以数组 intervals 表示若干个区间的集合，其中单个区间为 intervals[i] = [starti, endi] 。请你合并所有重叠的区间，并返回 一个不重叠的区间数组，该数组需恰好覆盖输入中的所有区间 。
+
+```
+class Solution {
+public:
+    vector<vector<int>> merge(vector<vector<int>>& intervals) {
+        vector<vector<int>> ans;
+        sort(intervals.begin(),intervals.end());
+        vector<int>curr; 
+        for(auto interval:intervals)
+        {
+            if(curr.empty()) curr = {interval[0],interval[1]};
+            
+            else if(interval[0]>=curr[0] && interval[0]<=curr[1]){curr[1]=max(curr[1],interval[1]);}
+            else {ans.push_back(curr);curr =interval;}
+        }
+        ans.push_back(curr);
+    return ans;
+}
+};
+```
+1. vector<vector<int>> 的排序是按照每行第一个值排序的（集合start）；
+
+2. 别忘最后需要将curr加入。 
+
+---
+
+# 189. 轮转数组
+
+给定一个整数数组 nums，将数组中的元素向右轮转 k 个位置，其中 k 是非负数。
+
+```
+class Solution {
+public:
+    void rotate(vector<int>& nums, int k) {
+        int n = k % nums.size();
+        reverse(nums.begin(),nums.end());
+        reverse(nums.begin(),nums.begin()+n);
+        reverse(nums.begin()+n,nums.end());
     }
 };
 ```
 
+1. 翻转三次。左闭右开。 
+
+2. 先取余！！
+
 ---
+
+# 238. 除自身以外数组的乘积
+
+给你一个整数数组 nums，返回 数组 answer ，其中 answer[i] 等于 nums 中除 nums[i] 之外其余各元素的乘积 。
+
+题目数据 保证 数组 nums之中任意元素的全部前缀元素和后缀的乘积都在  32 位 整数范围内。
+
+请 不要使用除法，且在 O(n) 时间复杂度内完成此题
+
+```
+class Solution {
+public:
+    vector<int> productExceptSelf(vector<int>& nums) {
+        vector<int>pre(nums.size(),1);
+        vector<int>pos(nums.size(),1);
+        vector<int>ans(nums.size(),1);
+        for(int i =1;i<nums.size();i++)
+        {
+            pre[i]=pre[i-1]*nums[i-1];
+        }
+        for(int j=nums.size()-2; j>=0 ; --j)
+        {
+            pos[j]=pos[j+1]*nums[j+1];
+        }
+
+        for(int i =0;i<nums.size();i++)
+        {
+            ans[i]=pre[i]*pos[i];
+        }
+    return ans;
+}
+};
+```
+
+1. 前缀积 * 后缀积
+
+2.注意前后缀是i-1和j+1
+
+
+---
+
+# 41. 缺失的第一个正数
+
+给你一个未排序的整数数组 nums ，请你找出其中没有出现的最小的正整数。
+
+请你实现时间复杂度为 O(n) 并且只使用常数级别额外空间的解决方案。
+
 
 # 94
 给定一个二叉树的根节点 root ，返回 它的 中序 遍历 。
