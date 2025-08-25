@@ -664,6 +664,39 @@ easy
 
 1.从左下开始，大于当前，排除本行，小于当前，排除本列；
 
+---
+
+# 160. 相交链表
+
+给你两个单链表的头节点 headA 和 headB ，请你找出并返回两个单链表相交的起始节点。如果两个链表不存在相交节点，返回 null 。
+
+```
+struct ListNode {
+      int val;
+      ListNode *next;
+      ListNode(int x) : val(x), next(NULL) {}
+  };
+ 
+class Solution {
+public:
+    ListNode *getIntersectionNode(ListNode *headA, ListNode *headB) {
+        ListNode *A = headA, *B = headB;
+        while(A!=B)
+        {
+            A= (A==nullptr? headB: A->next);
+            B= (B==nullptr? headA: B->next);
+        }
+    return A;
+    }
+};
+```
+1. l1走完走l2,l2走完走l1，距离相同
+
+2. 结束条件为A！=B ，那么判断时就是同为nullptr，变换到对方的头。
+
+3. 不要忘记新建节点。
+
+---
 
 # 94
 给定一个二叉树的根节点 root ，返回 它的 中序 遍历 。
