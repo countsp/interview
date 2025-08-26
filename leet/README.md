@@ -698,6 +698,41 @@ public:
 
 ---
 
+# 206. 反转链表
+
+给你单链表的头节点 head ，请你反转链表，并返回反转后的链表。
+
+```
+class Solution {
+public:
+    ListNode* reverseList(ListNode* head) {
+        unordered_map<ListNode*,ListNode*> mp;
+        ListNode* a = head;
+        ListNode* prev = nullptr;
+        while(a)
+        {   ListNode* b;
+            b=a->next;
+            a->next= prev;
+            prev = a;
+            a=b;
+        }
+        return prev;
+    }
+};
+```
+1.按照定义来做：遍历+接上已有链表
+
+---
+# 234. 回文链表
+
+给你一个单链表的头节点 head ，请你判断该链表是否为回文链表。如果是，返回 true；否则，返回 false 。
+
+```
+
+```
+
+---
+
 # 94
 给定一个二叉树的根节点 root ，返回 它的 中序 遍历 。
 
