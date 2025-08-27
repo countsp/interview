@@ -728,8 +728,53 @@ public:
 给你一个单链表的头节点 head ，请你判断该链表是否为回文链表。如果是，返回 true；否则，返回 false 。
 
 ```
+class Solution {
+public:
+    ListNode* reverseList(ListNode* head) {
+        unordered_map<ListNode*,ListNode*> mp;
+        ListNode* a = head;
+        ListNode* prev = nullptr;
+        while(a)
+        {   ListNode* b;
+            b=a->next;
+            a->next= prev;
+            prev = a;
+            a=b;
+        }
+        return prev;
+    }
+    bool isPalindrome(ListNode* head) {
+        ListNode* a = head;
+        ListNode* b = head;
+        while(b!=nullptr && b->next!=nullptr)
+        {
+            b=b->next->next;
+            a=a->next;
+        }
+        ListNode* second  =reverseList(a);
 
+        ListNode* p1 = head;
+        ListNode* p2 = second;
+
+        while(p2)
+        {
+            if(p1->val==p2->val)
+            {
+                p1=p1->next;
+                p2=p2->next;
+            }
+            else
+            {
+                return false;
+            }
+        }
+    return true;
+    }
+};
 ```
+1.回文->前后相同->找到中点->快慢指针
+
+2.只要while(翻转)并与整个链比较就够了。
 
 ---
 
