@@ -778,6 +778,178 @@ public:
 
 ---
 
+# 141. 环形链表
+
+给你一个链表的头节点 head ，判断链表中是否有环。
+
+如果链表中有某个节点，可以通过连续跟踪 next 指针再次到达，则链表中存在环。 为了表示给定链表中的环，评测系统内部使用整数 pos 来表示链表尾连接到链表中的位置（索引从 0 开始）。注意：pos 不作为参数进行传递 。仅仅是为了标识链表的实际情况
+
+```
+class Solution {
+public:
+    bool hasCycle(ListNode *head) {
+        ListNode* a = head;
+        ListNode* b = head;
+        while(b && b->next)
+        {
+            b=b->next->next;
+            a=a->next;
+            if(a==b){return true;}
+        }
+        return false;
+    }
+};
+```
+1.快的走到底了，那就没有环
+
+2.碰头了就是有环
+
+---
+
+# 142. 环形链表 II
+
+给定一个链表的头节点  head ，返回链表开始入环的第一个节点。 如果链表无环，则返回 null。
+
+如果链表中有某个节点，可以通过连续跟踪 next 指针再次到达，则链表中存在环。 为了表示给定链表中的环，评测系统内部使用整数 pos 来表示链表尾连接到链表中的位置（索引从 0 开始）。如果 pos 是 -1，则在该链表中没有环。注意：pos 不作为参数进行传递，仅仅是为了标识链表的实际情况。
+
+```
+class Solution {
+public:
+    ListNode *detectCycle(ListNode *head) {
+        ListNode* a = head;
+        ListNode* b = head;
+        while(b && b->next)
+        {
+            b=b->next->next;
+            a=a->next;
+            if(a==b){
+                ListNode* slow = head;
+                while(slow!=b){slow=slow->next;b=b->next;}
+                    return b;
+                }
+        }
+        return nullptr;
+    }
+    
+
+};
+```
+
+1.保留快慢指针，如果a==b那就是有环，就把慢的放在头，再稳步走，必能在入口碰头。
+
+2.推导
+
+链表从头到环入口的长度：x
+
+环长：c
+
+从入口到相遇点沿环前进的距离：y
+
+慢指针速度 1，快指针速度 2。第一次相遇时，慢指针总步数记为 t。
+
+因为慢指针从头走到相遇点，必然先走 x 到达入口，再在环内走 y 到相遇点，所以：
+
+t = x + y                             …(1)
+
+快指针走了 2t 步。它也要走 x 才能进环，然后在环里比慢指针多绕了若干圈再到相遇点。设多绕了 k 圈（k≥1），则：
+
+2t = x + y + k*c                      …(2)
+
+
+用 (2) − (1) 得到：
+
+t = k*c  ⇒  x + y = k*c  ⇒  x = k*c - y      …(3)
+
+---
+
+# 21. 合并两个有序链表
+
+将两个升序链表合并为一个新的 升序 链表并返回。新链表是通过拼接给定的两个链表的所有节点组成的。 
+
+```
+class Solution {
+public:
+    ListNode* mergeTwoLists(ListNode* list1, ListNode* list2) {
+        ListNode * a = list1;
+        ListNode * b = list2;
+        ListNode dummy(0);
+        ListNode *curr=&dummy;
+        while(a && b)
+        {
+            if(a->val <= b->val){curr->next= a; a=a->next;}
+            else {curr->next = b;b=b->next;}
+            curr= curr->next;
+        }
+        if(a){curr->next= a;}
+        if(b){curr->next= b;}
+        return dummy.next;
+
+    }
+};
+```
+1.哑节点的构造为：
+ListNode dummy(0);ListNode *curr=&dummy;
+
+使用为：dummy.next;
+        
+2.if(a){curr->next= a;} 直接加上就行
+
+---
+# **2. 两数相加
+
+给你两个 非空 的链表，表示两个非负的整数。它们每位数字都是按照 逆序 的方式存储的，并且每个节点只能存储 一位 数字。
+
+请你将两个数相加，并以相同形式返回一个表示和的链表。
+
+你可以假设除了数字 0 之外，这两个数都不会以 0 开头。
+
+```
+class Solution {
+public:
+    ListNode* addTwoNumbers(ListNode* l1, ListNode* l2) {
+        ListNode dummy(0);            // 哑头结点
+        ListNode* head = &dummy;
+        ListNode* prev= head;
+        int num=0;int cnt=0;
+
+        while(l1 || l2|| cnt)
+        {   int x,y;
+            x = l1 ? l1->val : 0;
+            y = l2 ? l2->val : 0;
+            num = (x+y+cnt)%10;
+            cnt = (x+y+cnt)/10;
+
+            ListNode * curr = new ListNode(num);
+            
+            prev->next= curr;
+            prev =prev->next;
+            if(l1)l1=l1->next;
+            if(l2)l2=l2->next;
+        }
+       
+        if(cnt)
+        {
+            
+            prev->next=new ListNode(cnt);
+        }
+    return head->next;
+}
+};
+```
+1.语法：ListNode * curr = new ListNode(num);或者ListNode dummy(0);ListNode *curr=&dummy;初始化
+
+2. 合并 l1,l2,carry三种情况，用 x = l1 ? l1->val : 0; 做合并
+
+3.不要忘记最后一次carry的判定
+
+---
+# 19. 删除链表的倒数第 N 个结点
+
+给你一个链表，删除链表的倒数第 n 个结点，并且返回链表的头结点。
+
+
+
+**
 # 94
 给定一个二叉树的根节点 root ，返回 它的 中序 遍历 。
 
