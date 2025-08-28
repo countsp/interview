@@ -895,7 +895,7 @@ ListNode dummy(0);ListNode *curr=&dummy;
 2.if(a){curr->next= a;} 直接加上就行
 
 ---
-# **2. 两数相加
+# 2. 两数相加
 
 给你两个 非空 的链表，表示两个非负的整数。它们每位数字都是按照 逆序 的方式存储的，并且每个节点只能存储 一位 数字。
 
@@ -947,14 +947,83 @@ public:
 
 给你一个链表，删除链表的倒数第 n 个结点，并且返回链表的头结点。
 
+```
+class Solution {
+public:
+    ListNode* removeNthFromEnd(ListNode* head, int n) {
+        ListNode dummy(0);
+        ListNode * a = &dummy;dummy.next = head;
+        ListNode *f =a,*curr= a;
+
+        for(int i =0;i<n;++i)
+        {
+            curr = curr->next;
+        }
+        while(curr->next)
+        {
+            curr = curr->next;
+            f=f->next;
+        }
+        f->next=f->next->next;
+        return a->next;
+
+    }
+};
+```
+1.fast先走n步，再和slow同步走，fast走到最后，slow就是倒数k个结点。
+
+2.但是去掉k，必须到k-1，那就前面加上dummy
+
+3.dummy 不要忘记和head链接
+
+---
+
+# 24. 两两交换链表中的节点
+
+给你一个链表，两两交换其中相邻的节点，并返回交换后链表的头节点。你必须在不修改节点内部的值的情况下完成本题（即，只能进行节点交换）。
+
+```
+class Solution {
+public:
+    ListNode* swapPairs(ListNode* head) {
+        ListNode * dummy = new ListNode(0);
+        dummy->next = head;
+        ListNode * a =dummy;
+        
+        while(a->next && a->next->next)
+        {   ListNode* first = a->next, *second =first->next;
+            first->next = second->next;
+            a->next = second;
+            second->next = first;
+            a=a->next->next;
+        }
+    return dummy->next;
+    }
+};
+```
+1. 用dummy来间接表示第一个和第二个；不要搞复杂了，直接用first和second表示。
+
+2. 换完不要忘记推进a
 
 
-**
-# 94
-给定一个二叉树的根节点 root ，返回 它的 中序 遍历 。
+---
+# 25. K 个一组翻转链表
+
+给你链表的头节点 head ，每 k 个节点一组进行翻转，请你返回修改后的链表。
+
+k 是一个正整数，它的值小于或等于链表的长度。如果节点总数不是 k 的整数倍，那么请将最后剩余的节点保持原有顺序。
+
+你不能只是单纯的改变节点内部的值，而是需要实际进行节点交换。
 
 ```
 
+```
+---
+
+# 94 二叉树的中序遍历
+给定一个二叉树的根节点 root ，返回 它的 中序 遍历 。
+
+```
 class Solution {
 public:
     void dfs(TreeNode* root,vector<int>& ans)
@@ -1060,3 +1129,5 @@ public:
 
 
 ```
+
+---
