@@ -1,6 +1,71 @@
 
 
 # ParkingE2E
+
+# LSS
+
+```
+self.lss_bev_model(images, intrinsics, extrinsics)
+        ↓
+__call__(...)  # nn.Module 自动定义
+        ↓
+forward(images, intrinsics, extrinsics)
+        ↓
+calc_bev_feature(images, intrinsics, extrinsics)
+        ├── get_geometry(...)       ← 利用相机内外参和 frustum 获取三维坐标
+        ├── encoder_forward(...)    ← EfficientNet将图像编码为特征 + 深度（lift:**真正获取深度**）
+        └── proj_bev_feature(...)   ← 将图像特征投影到 BEV 空间（splat:**把特征撒到 BEV 平面**）
+        ↓
+return bev_feature, pred_depth
+```
+
+#### 功能
+
+显式地编码了像素->空间的映射关系，加速训练收敛
+
+**bev_camera, pred_depth = self.lss_bev_model(images, intrinsics, extrinsics)**  #bev语义特征图 每个深度层的概率分布
+
+**内部：**
+
+1.使用 `EfficientNet` 提取每个相机图像的语义特征和（如果启用）像素级深度分布：
+
+2.使用 `create_frustum()` 得到图像空间中的 3D 采样网格（u, v, d），即为每个像素采样多个深度层。
+
+3.将每个像素点 + 深度点投影到世界坐标系下的 3D 点坐标（通过 `intrinsics`、`extrinsics`）
+
+4.多个相机的所有深度层上每个像素位置对应的特征 `x_b` 被投影到 BEV 网格中。相同 BEV 网格（x, y）上多个相机 / 多个深度层落下来的特征会 **聚合（求和）**
+
+### 具体：LssBevModel
+
+self.frustum = self.create_frustum() # 创建视锥体
+
+self.cam_encoder = CamEncoder(self.cfg, self.depth_channel)  #裁减EfficientNetB0
+
+# Encoder
+
+## Image Encoder
+
+bev_camera_encoder = self.image_res_encoder(bev_camera, flatten=False) 
+
+### BEV encoder
+
+就是经过了resnet18
+
+```
+trunk = resnet18(weights=None, zero_init_residual=True)
+
+self.conv1 = nn.Conv2d(in_channel, 64, kernel_size=7, stride=2, padding=3, bias=False)
+self.bn1 = trunk.bn1
+self.relu = trunk.relu
+self.max_pool = trunk.maxpool
+
+self.layer1 = trunk.layer1
+self.layer2 = trunk.layer2
+self.layer3 = trunk.layer3
+self.layer4 = trunk.layer4
+```
+
+
 ## 为什么用Efficientnet
 
 **大小：**
@@ -327,66 +392,6 @@ xy_max:15m
 
 
 
-## LSS
-
-self.lss_bev_model(images, intrinsics, extrinsics)
-        ↓
-__call__(...)  # nn.Module 自动定义
-        ↓
-forward(images, intrinsics, extrinsics)
-        ↓
-calc_bev_feature(images, intrinsics, extrinsics)
-        ├── get_geometry(...)       ← 利用相机内外参和 frustum 获取三维坐标
-        ├── encoder_forward(...)    ← EfficientNet将图像编码为特征 + 深度（lift:**真正获取深度**）
-        └── proj_bev_feature(...)   ← 将图像特征投影到 BEV 空间（splat:**把特征撒到 BEV 平面**）
-        ↓
-return bev_feature, pred_depth
-
-#### 功能
-
-显式地编码了像素->空间的映射关系，加速训练收敛
-
-**bev_camera, pred_depth = self.lss_bev_model(images, intrinsics, extrinsics)**  #bev语义特征图 每个深度层的概率分布
-
-**内部：**
-
-1.使用 `EfficientNet` 提取每个相机图像的语义特征和（如果启用）像素级深度分布：
-
-2.使用 `create_frustum()` 得到图像空间中的 3D 采样网格（u, v, d），即为每个像素采样多个深度层。
-
-3.将每个像素点 + 深度点投影到世界坐标系下的 3D 点坐标（通过 `intrinsics`、`extrinsics`）
-
-4.多个相机的所有深度层上每个像素位置对应的特征 `x_b` 被投影到 BEV 网格中。相同 BEV 网格（x, y）上多个相机 / 多个深度层落下来的特征会 **聚合（求和）**
-
-### 具体：LssBevModel
-
-self.frustum = self.create_frustum() # 创建视锥体
-
-self.cam_encoder = CamEncoder(self.cfg, self.depth_channel)  #裁减EfficientNetB0
-
-# Encoder
-
-## Image Encoder
-
-bev_camera_encoder = self.image_res_encoder(bev_camera, flatten=False) 
-
-### BEV encoder
-
-就是经过了resnet18
-
-```
-trunk = resnet18(weights=None, zero_init_residual=True)
-
-self.conv1 = nn.Conv2d(in_channel, 64, kernel_size=7, stride=2, padding=3, bias=False)
-self.bn1 = trunk.bn1
-self.relu = trunk.relu
-self.max_pool = trunk.maxpool
-
-self.layer1 = trunk.layer1
-self.layer2 = trunk.layer2
-self.layer3 = trunk.layer3
-self.layer4 = trunk.layer4
-```
 
 ## Target encoder
 
