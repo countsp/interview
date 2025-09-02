@@ -1,5 +1,5 @@
 # 1. 两数之和
-给定一个整数数组 nums 和一个整数目标值 target，请你在该数组中找出 和为目标值 target  的那 两个 整数，并返回它们的数组下标。
+给定一个整数数组 nums 和一个整数目标值 target，请你在该数组中找出 和为目标值 target 的那 两个 整数，并返回它们的数组下标。
 
 你可以假设每种输入只会对应一个答案，并且你不能使用两次相同的元素。
 
@@ -1539,3 +1539,110 @@ public:
 1.不同地方在于：右括号的判定需要加上。
 
 2.start==2*n不是n
+
+# 79. 单词搜索
+
+给定一个 m x n 二维字符网格 board 和一个字符串单词 word 。如果 word 存在于网格中，返回 true ；否则，返回 false 。
+
+单词必须按照字母顺序，通过相邻的单元格内的字母构成，其中“相邻”单元格是那些水平相邻或垂直相邻的单元格。同一个单元格内的字母不允许被重复使用
+
+```
+class Solution {
+public:
+    bool exist(vector<vector<char>>& board, string word) {
+        
+    }
+};
+```
+
+---
+# 35. 搜索插入位置
+
+给定一个排序数组和一个目标值，在数组中找到目标值，并返回其索引。如果目标值不存在于数组中，返回它将会被按顺序插入的位置。
+
+请必须使用时间复杂度为 O(log n) 的算法。
+
+```
+class Solution {
+public:
+    int find(vector<int>& nums, int target ,int l,int r)
+    {   if(l>r){return l;}
+    
+        int mid = l+(r-l)/2;
+        if (nums[mid]==target)
+            return mid;
+        else if(nums[mid]>target){
+            return find(nums,target,l,mid-1);
+        }
+        else{
+            return find(nums,target,mid+1,r);
+        }
+    }
+    int searchInsert(vector<int>& nums, int target) {
+        int l=0; int r =nums.size()-1;
+        return find(nums,target,l,r);
+    }
+};
+```
+
+1.不要忘记mid+1
+
+2.终止条件 if(l>r){return l;}
+
+---
+
+# 34. 在排序数组中查找元素的第一个和最后一个位置
+
+给你一个按照非递减顺序排列的整数数组 nums，和一个目标值 target。请你找出给定目标值在数组中的开始位置和结束位置。
+
+如果数组中不存在目标值 target，返回 [-1, -1]。
+
+你必须设计并实现时间复杂度为 O(log n) 的算法解决此问题。
+
+```
+class Solution {
+public:
+    int findFirst(vector<int>& nums, int target) {
+        int l= 0,r =nums.size();
+        
+        while(l<r)
+        {   int mid = l+(r-l)/2;
+            if(nums[mid]>=target)
+            {
+                r = mid;
+            }
+            else{
+                l = mid+1;
+            }
+        }
+        return l; 
+    }
+    int findSec(vector<int>& nums, int target) {
+        int l= 0,r =nums.size();
+      
+        while(l<r)
+        {   int mid = l+(r-l)/2;
+            if(nums[mid]>target)
+            {
+                r = mid;
+            }
+            else{
+                l = mid+1;
+            }
+        }
+        return l; 
+    }
+    vector<int> searchRange(vector<int>& nums, int target)
+    {
+        int l= findFirst(nums,target);
+        int r= findSec(nums,target);
+        if(l == nums.size() || nums[l]!=target) return {-1,-1};
+
+        return{l,r-1};
+        
+        
+    }
+};
+```
+1. if(nums[mid]>=target) 第一个大于等于的 ：if(nums[mid]>target) ：第一个大于的
+
