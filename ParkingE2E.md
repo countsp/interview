@@ -2,6 +2,7 @@
 
 ### 整体结构
 
+
 ```
 self.lss_bev_model = LssBevModel(self.cfg)      # LssBevModel.init() 输出多个相机图像融合后的特征.低层次的 BEV 特征，因为它主要聚焦在从图像 → BEV 空间的几何映射和对齐，不涉及太多 BEV 空间中的上下文语义建模。
         self.image_res_encoder = BevEncoder(in_channel=self.cfg.bev_encoder_in_channel) #对 BEV 图像特征提取高层语义特征 多通道
@@ -54,6 +55,9 @@ self.frustum = self.create_frustum() # 创建视锥体
 
 self.cam_encoder = CamEncoder(self.cfg, self.depth_channel)  #裁减EfficientNetB0
 
+
+---
+
 # Encoder
 
 ## Image Encoder
@@ -79,7 +83,7 @@ self.layer4 = trunk.layer4
 ```
 
 
-## 为什么用Efficientnet
+## lss为什么用Efficientnet
 
 **大小：**
 
