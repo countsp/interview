@@ -1363,3 +1363,179 @@ public:
 
 ---
 
+# 78. 子集
+
+给你一个整数数组 nums ，数组中的元素 互不相同 。返回该数组所有可能的子集（幂集）。
+
+解集 不能 包含重复的子集。你可以按 任意顺序 返回解集。
+
+```
+class Solution {
+public:
+    void dfs(int start,vector<int>& nums,vector<int>& path,vector<vector<int>>& ans){
+        ans.push_back(path);
+        for(int i = start;i<nums.size();++i)
+        {
+            path.push_back(nums[i]);
+            dfs(i+1,nums,path,ans);
+            path.pop_back();
+        }
+    }
+
+    vector<vector<int>> subsets(vector<int>& nums) {
+        int start;vector<int>path;vector<vector<int>> ans;
+        dfs(0,nums,path,ans);
+    return ans;
+}
+};
+```
+多做
+
+1. for内的循环条件不同， 使用start作为 参数，控制下一层只能从“后面”继续选
+
+**核心对比**
+
+**目标性质**
+
+子集：不看顺序，同一元素集合 {1,2} 与 {2,1} 是同一个结果 → 需要避免换序产生重复。
+
+全排列：看顺序，[1,2,3] 与 [2,1,3] 是不同结果。
+
+**搜索树形态**
+
+子集：深度 0..n；每到一个状态就收集一次（因为任何长度都算子集）。
+
+全排列：深度固定为 n；只在长度 == n 时收集（必须放满）。
+
+**去重方式 / 状态控制**
+
+子集：用 start 控制下一层只能从“后面”继续选，避免同一层选到以前的元素而产生换序重复；不需要 used。
+
+全排列：每层都能从所有未用元素里选，需要 used[]（或“原地交换法”的 pos）来防止重复使用同一元素。
+
+**收集时机**
+
+子集：进入 dfs 的第一行就 ans.push_back(path)。
+
+全排列：当 path.size()==n 时才 ans.push_back(path)。
+
+---
+
+# 17. 电话号码的字母组合
+
+给定一个仅包含数字 2-9 的字符串，返回所有它能表示的字母组合。答案可以按 任意顺序 返回。
+
+给出数字到字母的映射如下（与电话按键相同）。注意 1 不对应任何字母。
+
+```
+class Solution {
+public:
+    void dfs(int& start,const string& digits,const vector<string> & map,string& path,vector<string>& ans)
+    {   
+        if(start==digit.size())
+        {
+            ans.push_back(path);return;
+        }
+        int d = digits[start]-'0';
+        for(char ch: map[d])
+            {
+                path.push_back(ch);
+                dfs(start + 1,digits,map,path,ans);
+                path.pop_back();
+            }
+        
+    }
+    vector<string> letterCombinations(string digits) {
+        vector<string>ans;
+        string path;
+        vector<string> map = {"", "", "abc", "def", "ghi", "jkl", "mno", "pqrs", "tuv", "wxyz"};
+        dfs(0,digits,map,path,ans);
+    }
+};
+```
+多做
+
+1. 用start表示当前位，所有参数融进变量中。
+
+2. vector<string> map = {"", "", "abc", "def", "ghi", "jkl", "mno", "pqrs", "tuv", "wxyz"};来简约表示
+   
+---
+
+# 39. 组合总和
+
+给你一个 无重复元素 的整数数组 candidates 和一个目标整数 target ，找出 candidates 中可以使数字和为目标数 target 的 所有 不同组合 ，并以列表形式返回。你可以按 任意顺序 返回这些组合。
+
+candidates 中的 同一个 数字可以 无限制重复被选取 。如果至少一个数字的被选数量不同，则两种组合是不同的。 
+
+对于给定的输入，保证和为 target 的不同组合数少于 150 个。
+
+```
+class Solution {
+public:
+    void dfs(int start,vector<int>& path,vector<int>& candidates, int target,vector<vector<int>>& ans,int& sum){
+        if(sum==target){ans.push_back(path);return;}
+        
+        for(int i =start;i<candidates.size();i++)
+        {   
+            if(sum>target){return;}
+            path.push_back(candidates[i]);
+            sum+=candidates[i];
+            dfs(i,path,candidates,target,ans,sum);
+            sum-=candidates[i];
+            path.pop_back();
+        }
+    }
+    vector<vector<int>> combinationSum(vector<int>& candidates, int target) {
+        vector<vector<int>> ans;vector<int>path;int sum=0;
+        dfs(0,path,candidates,target,ans,sum);
+    return ans;
+}
+};
+```
+多写
+
+1.随便写出来的，dfs(i,path,candidates,target,ans,sum);注意这里是i不是i+1
+
+---
+
+# 22. 括号生成
+
+数字 n 代表生成括号的对数，请你设计一个函数，用于能够生成所有可能的并且 有效的 括号组合。
+
+```
+class Solution {
+public:
+    void dfs(int start,string & path,vector<string>& ans,int& n,int open,int close)
+    {
+        if (start==2*n){
+            if(open==n){ans.push_back(path);return;}
+            else {return;}
+
+        }
+            
+        path.push_back('(');open++;
+        dfs(start+1,path,ans,n,open,close);
+        path.pop_back();open--;
+        
+        if(close<open)
+        {
+            path.push_back(')');
+            close++;
+            dfs(start+1,path,ans,n,open,close);
+            path.pop_back();
+            close--;
+        }
+
+    }
+    vector<string> generateParenthesis(int n) {
+        int num=0; string path; vector<string>ans;int open=0;int close = 0;
+        dfs(0,path,ans,n,open,close);
+    return ans;
+    }
+
+};
+```
+
+1.不同地方在于：右括号的判定需要加上。
+
+2.start==2*n不是n
