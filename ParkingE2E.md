@@ -104,7 +104,7 @@ self.layer4 = trunk.layer4
 
 ### EfficientNet
 
-**1.升维 Expansion：**
+**1.升维 Expansion：** 
 
 1×1 Conv（扩展）: Cin → Cin × t =Cexp
 
@@ -112,12 +112,12 @@ self.layer4 = trunk.layer4
 nn.Conv2d(16, 96, kernel_size=1, bias=False),
 ```
 
-**提升特征维度：**提供更多中间特征组合，增加表达能力。
+**提升特征维度：** 提供更多中间特征组合，增加表达能力。
 
-**增强 depthwise 卷积效果： **depthwise 不处理通道间信息，扩展后能处理更细致的局部空间特征
+**增强 depthwise 卷积效果：** ：depthwise 不处理通道间信息，扩展后能处理更细致的局部空间特征
 
 ​		│
-​       ▼
+​                ▼
 
 （BatchNorm + Swish）
 
@@ -126,22 +126,22 @@ nn.BatchNorm2d(96)
 nn.SiLU()
 ```
 
-​       │
-
-​       ▼
+        ​       │
+        
+        ​       ▼
 
 2.**深度可分离卷积：**
 
 每个通道单独使用一个卷积核进行卷积，**大大减少参数量和计算量**。
 
 ​		│
-​       ▼
+​                ▼
 
 （BatchNorm + Swish）
 
-​       │
-
-​       ▼
+        ​       │
+        
+        ​       ▼
 
 3.**SE 模块（Squeeze-and-Excitation）**：
 
