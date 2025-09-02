@@ -1185,9 +1185,181 @@ public:
 
 2.用dfs来填写这个表：如果边界外/原表为0/已经看过，就return回到上个dfs函数中。
 
-3.
+3.注意用return返回上层
 
 break	跳出当前循环或switch语句	用于循环(for/while)或switch内部
 
 return	结束当前函数执行并返回值	用于if等函数内部，结束整个函数
+
+---
+
+# 994. 腐烂的橘子
+
+在给定的 m x n 网格 grid 中，每个单元格可以有以下三个值之一：
+
+值 0 代表空单元格；
+值 1 代表新鲜橘子；
+值 2 代表腐烂的橘子。
+每分钟，腐烂的橘子 周围 4 个方向上相邻 的新鲜橘子都会腐烂。
+
+返回 直到单元格中没有新鲜橘子为止所必须经过的最小分钟数。如果不可能，返回 -1 。
+
+```
+class Solution {
+public:
+    int orangesRotting(vector<vector<int>>& grid) {
+        int m =grid.size();
+        int n = grid[0].size();
+        int fresh = 0, cnt = -1;
+        queue<pair<int,int>> rot;
+        vector<pair<int,int>> directions= {{0,1},{0,-1},{1,0},{-1,0}};
+        for(int i =0;i<m;++i)
+        {
+            for(int j =0;j<n;++j)
+            {
+                if(grid[i][j]==2) rot.push({i,j});
+                if(grid[i][j]==1) fresh++;
+            }
+        }
+
+        if (fresh == 0) return 0;
+        
+        while (!rot.empty())
+        {   bool infected = false; 
+            int size = rot.size();
+            for(int i =0;i<size;++i)
+            {
+                auto pos = rot.front();
+                rot.pop();
+                for(auto direction:directions)
+                    {
+                        int x = pos.first + direction.first;
+                        int y = pos.second + direction.second;
+                        if(x>=0 && x<m && y>=0 && y<n && grid[x][y]==1)
+                        {
+                            grid[x][y]=2;
+                            fresh--;
+                            rot.push({x,y});
+                        }
+                    }
+            }
+            cnt++;
+        }
+        if (fresh!=0) return -1;
+        else {return cnt;}
+
+    }
+};
+```
+
+1.多源BFS初始化：将所有初始腐烂的橘子加入队列 使用queue，用front(),pop(),push()
+
+2.统计新鲜橘子：记录初始新鲜橘子的数量
+
+3.分层BFS：每分钟处理当前层的所有腐烂橘子，感染周围的新鲜橘子（把queue中已有的记录个数遍历这么多个）
+
+4.时间统计：每完成一层BFS，时间增加1分钟
+
+5. 结果检查：如果最后还有新鲜橘子剩余，返回-1；否则返回总时间
+
+6. queue和deque
+
+---
+
+
+# 207.课程表
+
+
+你这个学期必须选修 numCourses 门课程，记为 0 到 numCourses - 1 。
+
+在选修某些课程之前需要一些先修课程。 先修课程按数组 prerequisites 给出，其中 prerequisites[i] = [ai, bi] ，表示如果要学习课程 ai 则 必须 先学习课程  bi 。
+
+例如，先修课程对 [0, 1] 表示：想要学习课程 0 ，你需要先完成课程 1 。
+请你判断是否可能完成所有课程的学习？如果可以，返回 true ；否则，返回 false 。
+
+```
+class Solution {
+public:
+    bool canFinish(int numCourses, vector<vector<int>>& prerequisites) {
+        vector<int>indeg(numCourses,0);vector<vector<int>>g(numCourses);
+        
+       
+        for(int i = 0;i<prerequisites.size();++i)
+        {   g[prerequisites[i][1]].push_back(prerequisites[i][0]);
+            indeg[prerequisites[i][0]]++;
+        }
+
+        queue<int>q;
+        for(int i = 0;i<numCourses;++i)
+        {   if(indeg[i]==0) {q.push(i);} 
+
+        }
+
+        int cnt=0;
+
+        while(!q.empty())
+        {
+            int len = q.size();
+            for(int i = 0;i<len;++i)
+            {   
+                int temp = q.front();
+                q.pop();cnt++;
+                for(auto item:g[temp])
+                {
+                  if(--indeg[item]==0){q.push(item);}
+                }
+            }
+            
+        }
+
+        return cnt==numCourses;
+    }
+};
+```
+1.queue不能随机存储
+
+2.逻辑：
+
+先把所有入度为 0 的点入队 q（所有无依赖的），循环取队头 u。认为 u 已“学完”（或已输出），**出队后计数 cnt++**；遍历 u 的所有下家 v ∈ g[u]，执行 --indeg[v]；
+
+若某个下家 v 的入度因此变成 0，就把 v 入队。队列空了后，若 cnt == n，说明能把所有点处理完（无环、可修完）；否则有环（至少一些点入度始终 >0）。
+
+---
+
+# 46. 全排列
+
+给定一个不含重复数字的数组 nums ，返回其 所有可能的全排列 。你可以 按任意顺序 返回答案。
+```
+class Solution {
+public:
+    void dfs(vector<int>& nums,vector<int>& used,vector<int>& path,vector<vector<int>>& ans){
+        if(path.size()==nums.size()){ans.push_back(path);return;}
+        for(int i =0;i<nums.size();i++)
+        {   
+            if (used[i]==0){
+                used[i]=1;
+                path.push_back(nums[i]);
+                dfs(nums,used,path,ans);
+                path.pop_back();
+                used[i]=0;
+            }
+        }
+
+    }
+    vector<vector<int>> permute(vector<int>& nums) {
+        int n= nums.size();
+        vector<int> used(n,0);vector<int> path;vector<vector<int>> ans;
+        dfs(nums,used,path,ans);
+        return ans;
+    }
+};
+
+```
+多做
+
+1.用dfs做，把没有用过的一直加入path，直到满。
+
+2.used来判断用没用过，如果用过了used就置1，用了就继续dfs，dfs结束了，就是满了，就弹出末尾，然后used置0，后续换到其他位置能够继续使用。
+
+---
 
