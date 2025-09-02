@@ -117,7 +117,7 @@ nn.Conv2d(16, 96, kernel_size=1, bias=False),
 **增强 depthwise 卷积效果：** ：depthwise 不处理通道间信息，扩展后能处理更细致的局部空间特征
 
 
-​		│
+​				│
 
 ​                ▼
 
@@ -134,22 +134,21 @@ nn.SiLU()
         
         ​       ▼
 
+
 2.**深度可分离卷积：**
 
 每个通道单独使用一个卷积核进行卷积，**大大减少参数量和计算量**。
 
-​		│
+​				│
 ​                ▼
 
 （BatchNorm + Swish）
 
-        ​       │
-        
-        ​       ▼
 
 **3.压缩层 (1×1 卷积)**
 
 再用一个 pointwise 卷积把通道数压缩回输出通道 
+
 
 **4.残差连接 (Residual / Skip Connection)**
 
@@ -197,7 +196,10 @@ nn.BatchNorm2d(24)
 
 保留原信息，提升梯度流动
 
-## Trainer
+
+---
+
+# Trainer
 
 设置训练器 Trainer，包括设备、分布式策略、日志记录、回调、验证频率等
 
