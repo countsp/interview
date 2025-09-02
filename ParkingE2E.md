@@ -1,7 +1,20 @@
-
-
 # ParkingE2E
 
+### 整体结构
+
+```
+self.lss_bev_model = LssBevModel(self.cfg)      # LssBevModel.init() 输出多个相机图像融合后的特征.低层次的 BEV 特征，因为它主要聚焦在从图像 → BEV 空间的几何映射和对齐，不涉及太多 BEV 空间中的上下文语义建模。
+        self.image_res_encoder = BevEncoder(in_channel=self.cfg.bev_encoder_in_channel) #对 BEV 图像特征提取高层语义特征 多通道
+
+        # Target Encoder
+        self.target_res_encoder = BevEncoder(in_channel=1) #变成一张具有空间语义信息的多通道目标特征图  这个 BEV 热点图本身只是个稀疏的点（像素上只有一小块是非零的），太原始了，不足以提供丰富的空间语义信息。
+
+        # BEV Query
+        self.bev_query = BevQuery(self.cfg) #将两个 BEV 特征进行 Transformer 融合，强调目标点区域 它的核心机制就是一个 Transformer Decoder ,cross-attention
+
+        # Trajectory Decoder
+        self.trajectory_decoder = self.get_trajectory_decoder() # 预测 token
+```
 # LSS
 
 ```
