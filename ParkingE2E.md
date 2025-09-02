@@ -102,11 +102,11 @@ self.layer4 = trunk.layer4
 
 
 
-### EfficientNet
+### EfficientNet： MBConv + SE + Swish
+
+## MBConv： Mobile Inverted Bottleneck Convolution
 
 **1.升维 Expansion：** 
-
-1×1 Conv（扩展）: Cin → Cin × t =Cexp
 
 ```
 nn.Conv2d(16, 96, kernel_size=1, bias=False),
@@ -116,15 +116,19 @@ nn.Conv2d(16, 96, kernel_size=1, bias=False),
 
 **增强 depthwise 卷积效果：** ：depthwise 不处理通道间信息，扩展后能处理更细致的局部空间特征
 
+
 ​		│
+
 ​                ▼
 
-（BatchNorm + Swish）
+
+        （BatchNorm + Swish）
 
 ```
 nn.BatchNorm2d(96)
 nn.SiLU()
 ```
+
 
         ​       │
         
@@ -143,15 +147,23 @@ nn.SiLU()
         
         ​       ▼
 
-3.**SE 模块（Squeeze-and-Excitation）**：
+**3.压缩层 (1×1 卷积)**
+
+再用一个 pointwise 卷积把通道数压缩回输出通道 
+
+**4.残差连接 (Residual / Skip Connection)**
+
+
+	​
+## SE 模块（Squeeze-and-Excitation）：
 
 提炼 + 降低参数量 & 计算量 ( 16 * 16-> 4 * 16 * 2)
 
-​			**Squeeze（压缩）**：全局平均池化，对每个通道压缩成一个标量
+**Squeeze（压缩）**：全局平均池化，对每个通道压缩成一个标量
 
-​			**Excitation（激励）**：通过一个两层 MLP 生成每个通道的权重
+**Excitation（激励）**：通过一个两层 MLP 生成每个通道的权重
 
-​			**Scale（重标定）**：用这些权重乘以原特征图，实现通道注意力
+**Scale（重标定）**：用这些权重乘以原特征图，实现通道注意力
 
 **用 `Sigmoid` 的输出（通道注意力权重）去“缩放”输入特征图的每一个通道**。
 
