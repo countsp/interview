@@ -202,7 +202,7 @@ gt   = data[:, 1:-1]
 
 
 ### 数据处理流程图
-
+```
 1. 初始化 ParkingDataModuleReal(config, is_train)
    └─ 设定配置、BOS/EOS/PAD token、相机标签等
    └─ 调用 create_gt_data()
@@ -251,7 +251,7 @@ gt   = data[:, 1:-1]
    ├─ target_point / fuzzy_target_point: Tensor[B, 2]
    ├─ intrinsics / extrinsics: Tensor[B, ...]
 
-
+```
 
 ## Data
 
