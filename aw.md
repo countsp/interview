@@ -22,6 +22,15 @@
   3. 发布 **插值后的初始位姿**（`/initial_pose_with_covariance`，包含位姿与协方差）
 - 当 NDT 初始化完成后，将 `is_completed=true`，供上层判断 
 
+
+	•	状态变量（state / prediction）：主要来自 IMU（惯性测量单元），EKF 会用 IMU 的角速度、加速度做预测更新（prediction step）。这样在没有外部观测时，车辆的姿态和位置可以通过积分得到，但会累积漂移。
+	•	观测量（measurement / update）：最常用的是 NDT（Normal Distributions Transform）匹配得到的位姿。
+NDT 会把当前激光点云和地图做配准，得到一个全局坐标系下的车辆位姿（x, y, z, roll, pitch, yaw）。EKF 将其作为观测输入来校正 IMU 的累积误差。
+
+与 ICP 的差异（一眼看懂）
+	•	ICP：点到点/点到面，重最近邻；容易陷入局部、对初始值更敏感。
+	•	NDT：点对分布（voxel 高斯），对噪声/稀疏更稳，对初始值要求较低，在稠密地图上更鲁棒。
+
 **EKF Localizer**
 
 - 接收 `/initialpose3d`（或 `/initial_pose_with_covariance`）和来自 IMU/里程计的 **gyro_odometer**、**twist_estimator** 数据
