@@ -195,3 +195,45 @@ x.view(1, -1, 28, 28)
 
 上三角-inf
 torch.triu(torch.ones(L, L) * float('-inf'), diagonal=1)
+
+---
+
+# bosch
+
+**模仿学习的定义**
+
+智能体（Agent）通过观察和模仿专家（Expert）的示范来学习任务策略，而不是通过自己大量试错（强化学习）。
+
+**fast bev**
+
+# 鱼眼模型
+
+核心模型：Kannala–Brandt（OpenCV fisheye 模块）
+
+---
+
+# mlp 
+
+```
+import torch
+import torch.nn as nn
+
+class MLP(nn.Module):
+    def __init__(self, input_size, hidden_size1, hidden_size2, output_size):
+        super().__init__()  
+
+        self.fc1 = nn.Linear(input_size, hidden_size1)
+        self.fc2 = nn.Linear(hidden_size1, hidden_size2)
+        self.fc3 = nn.Linear(hidden_size2, output_size)
+        self.relu1 = nn.ReLU()
+
+    def forward(self, x):
+        out = self.fc1(x)
+        out = self.relu1(out)
+        out = self.fc2(out)
+        out = self.relu2(out)
+        out = self.fc3(out)
+        return out
+```
+
+**self.relu1 = nn.ReLU()**
