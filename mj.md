@@ -296,3 +296,54 @@ def iou_loss(pred, target, eps=1e-6):
     return 1 - iou  # IoU 越大，loss 越小
 
 ```
+# GIOU
+
+**问题：**IoU=0 时无法优化（框不相交）
+
+**改进：**引入最小闭包矩形 𝐶，再加一个惩罚项：
+
+```
+import torch
+
+def giou_loss(pred, target, eps=1e-7):
+    """
+    pred:   Tensor [N, 4] (x1, y1, x2, y2)
+    target: Tensor [N, 4] (x1, y1, x2, y2)
+    return: Tensor [N] GIoU loss for each pair
+    """
+    # 交集
+    inter_x1 = torch.max(pred[:, 0], target[:, 0])
+    inter_y1 = torch.max(pred[:, 1], target[:, 1])
+    inter_x2 = torch.min(pred[:, 2], target[:, 2])
+    inter_y2 = torch.min(pred[:, 3], target[:, 3])
+
+    inter_w = (inter_x2 - inter_x1).clamp(min=0)
+    inter_h = (inter_y2 - inter_y1).clamp(min=0)
+    inter_area = inter_w * inter_h
+
+    # 各自面积
+    area_pred = (pred[:, 2] - pred[:, 0]).clamp(min=0) * \
+                (pred[:, 3] - pred[:, 1]).clamp(min=0)
+    area_target = (target[:, 2] - target[:, 0]).clamp(min=0) * \
+                  (target[:, 3] - target[:, 1]).clamp(min=0)
+
+    # 并集
+    union = area_pred + area_target - inter_area + eps
+    iou = inter_area / union
+
+    # 最小闭包矩形
+    enc_x1 = torch.min(pred[:, 0], target[:, 0])
+    enc_y1 = torch.min(pred[:, 1], target[:, 1])
+    enc_x2 = torch.max(pred[:, 2], target[:, 2])
+    enc_y2 = torch.max(pred[:, 3], target[:, 3])
+
+    enc_w = (enc_x2 - enc_x1).clamp(min=0)
+    enc_h = (enc_y2 - enc_y1).clamp(min=0)
+    enc_area = enc_w * enc_h + eps
+
+    # GIoU
+    giou = iou - (enc_area - union) / enc_area
+    loss = 1 - giou
+    return loss
+
+```
