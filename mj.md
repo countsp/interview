@@ -237,3 +237,83 @@ class MLP(nn.Module):
 ```
 
 **self.relu1 = nn.ReLU()**
+
+---
+
+# IOU
+```
+import numpy as np
+
+def iou_numpy(box1, box2):
+    """
+    box1: [x1, y1, x2, y2]
+    box2: [x1, y1, x2, y2]
+    """
+    # 交集坐标
+    x1 = max(box1[0], box2[0])
+    y1 = max(box1[1], box2[1])
+    x2 = min(box1[2], box2[2])
+    y2 = min(box1[3], box2[3])
+
+    # 交集面积
+    inter_w = max(0, x2 - x1)
+    inter_h = max(0, y2 - y1)
+    inter_area = inter_w * inter_h
+
+    # 各自面积
+    area1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
+    area2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
+
+    # 并集
+    union = area1 + area2 - inter_area
+
+    # IoU
+    iou = inter_area / union if union > 0 else 0.0
+    return iou
+
+# 测试
+b1 = [0, 0, 2, 2]
+b2 = [1, 1, 3, 3]
+print("NumPy IoU:", iou_numpy(b1, b2))  # 1/7 ≈ 0.142
+```
+Torch
+```
+import torch
+
+def iou_torch(boxes1, boxes2):
+    """
+    boxes1: Tensor [N, 4]  (x1, y1, x2, y2)
+    boxes2: Tensor [M, 4]
+    return: Tensor [N, M] pairwise IoU
+    """
+    N = boxes1.size(0)
+    M = boxes2.size(0)
+
+    # broadcast to [N, M, 4]
+    b1 = boxes1[:, None, :]  # [N,1,4]
+    b2 = boxes2[None, :, :]  # [1,M,4]
+
+    # 交集矩形
+    inter_x1 = torch.max(b1[..., 0], b2[..., 0])
+    inter_y1 = torch.max(b1[..., 1], b2[..., 1])
+    inter_x2 = torch.min(b1[..., 2], b2[..., 2])
+    inter_y2 = torch.min(b1[..., 3], b2[..., 3])
+
+    inter_w = (inter_x2 - inter_x1).clamp(min=0)
+    inter_h = (inter_y2 - inter_y1).clamp(min=0)
+    inter_area = inter_w * inter_h
+
+    # 各自面积
+    area1 = (b1[..., 2] - b1[..., 0]) * (b1[..., 3] - b1[..., 1])
+    area2 = (b2[..., 2] - b2[..., 0]) * (b2[..., 3] - b2[..., 1])
+
+    # 并集
+    union = area1 + area2 - inter_area
+    iou = inter_area / union.clamp(min=1e-6)
+    return iou
+
+# 测试
+boxes1 = torch.tensor([[0, 0, 2, 2]], dtype=torch.float32)
+boxes2 = torch.tensor([[1, 1, 3, 3], [0, 0, 1, 1]], dtype=torch.float32)
+print("Torch IoU:\n", iou_torch(boxes1, boxes2))
+```
