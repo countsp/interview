@@ -1,5 +1,20 @@
 # ParkingE2E
 
+PyTorch Lightning 内部的 summary 工具，把注册的 nn.Parameter 的 numel() 全部加起来
+```
+  | Name                             | Type               | Params
+------------------------------------------------------------------------
+0 | traj_point_loss_func             | TokenTrajPointLoss | 0     
+1 | traj_point_loss_func.ce_loss     | CrossEntropyLoss   | 0     
+2 | parking_model                    | ParkingModelReal   | 40.2 M
+3 | parking_model.lss_bev_model      | LssBevModel        | 4.3 M 
+4 | parking_model.image_res_encoder  | BevEncoder         | 11.4 M
+5 | parking_model.target_res_encoder | BevEncoder         | 11.2 M
+6 | parking_model.bev_query          | BevQuery           | 6.4 M （pos_embed = 200 × 200 × 128 = 5.12M）TransformerDecoder(3层, d_model=128) ≈ 1.3M
+7 | parking_model.trajectory_decoder | TrajectoryDecoder  | 6.9 M （d_model = 256 → 每层 = 16 × 256² = 1,048,576 ≈ 1.05M  4 层 → 4.19M）
+------------------------------------------------------------------------
+```
+
 ### 整体结构
 
 
