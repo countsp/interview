@@ -25,6 +25,8 @@ public:
 
 2.map有find和count两种方法，find快。
 
+3.{}表示空Vector
+
 ---
 
 # 49. 字母异位词分组
