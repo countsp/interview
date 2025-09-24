@@ -175,3 +175,24 @@ print("Softmax:", softmax(scores))
 
 这样所有 $x_i - m \le 0$，指数不会爆炸，同时结果完全不变（因为分子分母同时乘上了 $e^{-m}$ 被约掉）。
 
+
+# Focal loss
+```
+import torch
+import torch.nn.functional as F
+
+def focal_loss(pred, gt, alpha=2, beta=4):
+    """
+    pred: [B, C, H, W] —— 模型预测，sigmoid 后
+    gt:   [B, C, H, W] —— 高斯真值
+    """
+    pos_mask = (gt == 1).float()
+    neg_mask = (gt < 1).float()
+
+    pos_loss = - (1 - pred) ** alpha * torch.log(pred + 1e-6) * pos_mask
+    neg_loss = - (pred ** alpha) * ((1 - gt) ** beta) * torch.log(1 - pred + 1e-6) * neg_mask
+
+    num_pos = pos_mask.sum()
+    loss = (pos_loss.sum() + neg_loss.sum()) / torch.clamp(num_pos, min=1.0)
+    return loss
+```
