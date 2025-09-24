@@ -901,6 +901,64 @@ ListNode dummy(0);ListNode *curr=&dummy;
 2.if(a){curr->next= a;} 直接加上就行
 
 ---
+
+# 23.合并 K 个升序链表 
+
+给你一个链表数组，每个链表都已经按升序排列。 请你将所有链表合并到一个升序链表中，返回合并后的链表。
+
+```
+struct Compare{bool operator()(ListNode * a ,ListNode *b)
+        {
+            return a->val > b->val;
+        }
+    } ;
+class Solution {
+public:
+    
+    ListNode* mergeKLists(vector<ListNode*>& lists) {
+        priority_queue<ListNode * , vector<ListNode *>,Compare> pq ;
+        for(auto it:lists)
+        {
+            if(it){pq.push(it);}
+        }
+
+        ListNode dummy(0);
+        ListNode * tail =&dummy;
+        
+        while(!pq.empty())
+        {
+            ListNode* curr = pq.top();
+            pq.pop(); 
+            tail->next = curr;
+            tail = curr;
+            if (curr->next) pq.push(curr->next);
+        }
+    return dummy.next;
+
+    }
+};
+
+```
+1.小根堆在做，用propority_queue做。
+
+2.定义比较器
+
+```
+struct Compare {
+    bool operator()(ListNode* a, ListNode* b) {
+        return a->val > b->val;  // 值小的优先
+    }
+};
+```
+
+使用时要定义容器：priority_queue<类型, 容器, 比较器> 名字;
+
+```
+priority_queue<ListNode*, vector<ListNode*>, Compare> pq; 
+```
+
+
+---
 # 2. 两数相加
 
 给你两个 非空 的链表，表示两个非负的整数。它们每位数字都是按照 逆序 的方式存储的，并且每个节点只能存储 一位 数字。
