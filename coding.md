@@ -11,15 +11,24 @@ masked_fill(mask, value) 会把 mask=True 的位置替换成指定值（这里�
 attn  = F.softmax(scores,dim = -1)  # 数dim对应的值的行/列，所有元素softmax
 
 
+causal_mask 需要放到设备上
+
 ```
-out = out.transpose(1, 2).contiguous().view(B, Tq, self.d_model)
+causal_mask = torch.triu(
+    torch.ones(Tq, Tk, device=scores.device, dtype=torch.bool), diagonal=1
+)
+```
 
 在 PyTorch 里，张量的数据实际上是存放在一块连续的内存 buffer 里的。有些操作（比如 transpose, permute）不会真正移动数据，而是只改变「视图」(view)，通过 stride（步长）来改变索引方式。
 
 如果你直接对这种 非连续张量 调用 .view()，PyTorch 会报错，因为 .view() 要求底层数据是连续的。
 
 ```
+out = out.transpose(1, 2).contiguous().view(B, Tq, self.d_model)
 
+```
+
+softmax
 ```
 scores =
 [[1.0, 2.0, 3.0],   # query1 对 key1~3 的分数
