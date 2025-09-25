@@ -1713,4 +1713,41 @@ public:
 };
 ```
 1. if(nums[mid]>=target) 第一个大于等于的 ：if(nums[mid]>target) ：第一个大于的
+---
+
+# 84. 柱状图中最大的矩形
+```
+class Solution {
+public:
+    int largestRectangleArea(vector<int>& heights) {
+        int n = heights.size();
+        heights.push_back(0);
+        stack<int> st;
+        int ans =0;
+        for(int i=0 ;i<heights.size(); ++i)
+        {
+            while(!st.empty() && heights[i]<heights[st.top()])
+            {
+                int h = heights[st.top()];
+                st.pop();
+
+                int left = st.empty()? -1: st.top();
+                int width =  i- left -1;
+                ans = max(ans,h*width);
+            }
+            st.push(i);
+        }
+    return ans;
+    }
+};
+```
+
+1.用一个递增栈来保存index
+
+2.
+
+如果当前高度 ≥ 栈顶高度 → 入栈。
+
+如果当前高度 < 栈顶高度 → 说明栈顶柱子右边界确定了，开始出栈并计算面积: 遍历栈顶高度大于当前的：计算 left ，推width
+
 
