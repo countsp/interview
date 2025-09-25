@@ -347,3 +347,17 @@ def giou_loss(pred, target, eps=1e-7):
     return loss
 
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
