@@ -41,53 +41,133 @@ scores[2,3],dim = -1 对应 3 , 那就将每行三个softmax
 **Multihead attention**
 
 ```
+import math
+from typing import Optional, Tuple
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
 class MultiHeadAttention(nn.Module):
-    def __init__(self, d_model:int, num_heads:int, dropout:float=0.0 ,bias:bool = False ):
+    """
+    多头（自/交叉）注意力
+    输入:
+      query: [B, Tq, d_model]
+      key  : [B, Tk, d_model]  (若为自注意力，通常与query相同)
+      value: [B, Tk, d_model]  (若为自注意力，通常与key相同)
+      attn_mask: [B, 1, Tq, Tk] 或 [1, 1, Tq, Tk]，值为0/1；0位置会被mask掉
+                 （也可传bool，True=保留，False=mask）
+      causal: 是否开启上三角因果mask（用于decoder）
+    超参:
+      d_model: 模型维度
+      num_heads: 头数 (d_model % num_heads == 0)
+      dropout: 注意力分数上的dropout
+    返回:
+      out: [B, Tq, d_model]
+      attn: [B, num_heads, Tq, Tk] (注意力权重，若需要可用于可视化/对齐)
+    """
+    def __init__(self, d_model: int, num_heads: int, dropout: float = 0.0, bias: bool = True):
         super().__init__()
-        assert(d_model % num_heads ==0)
+        assert d_model % num_heads == 0, "d_model 必须能被 num_heads 整除"
         self.d_model = d_model
         self.num_heads = num_heads
+        self.d_head = d_model // num_heads
 
-        self.w_q = nn.Linear(d_model,d_model,bias = bias)
-        self.w_k = nn.Linear(d_model,d_model,bias = bias)
-        self.w_v = nn.Linear(d_model,d_model,bias = bias)
+        # 线性映射得到 Q,K,V
+        self.w_q = nn.Linear(d_model, d_model, bias=bias)
+        self.w_k = nn.Linear(d_model, d_model, bias=bias)
+        self.w_v = nn.Linear(d_model, d_model, bias=bias)
 
-        self.w_0 = nn.Linear(d_model,d_model,bias = bias)
+        # 输出映射
+        self.w_o = nn.Linear(d_model, d_model, bias=bias)
 
         self.attn_dropout = nn.Dropout(dropout)
         self.proj_dropout = nn.Dropout(dropout)
 
-    def forward(self, query:torch.Tensor, key: torch.Tensor, value :torch.Tensor, attn_mask:torch.Tensor, casual:bool = False ) -> Tuple[torch.Tensor,torch.Tensor]
-        if key is None: key = query
-        if value is None : value = query
+    def _shape(self, x: torch.Tensor, B: int) -> torch.Tensor:
+        # [B, T, d_model] -> [B, num_heads, T, d_head]
+        return x.view(B, -1, self.num_heads, self.d_head).transpose(1, 2)
 
-        B, Tq ,_ = query.shape
-        Tk = key.shape[1]
+    def forward(
+        self,
+        query: torch.Tensor,
+        key: Optional[torch.Tensor] = None,
+        value: Optional[torch.Tensor] = None,
+        attn_mask: Optional[torch.Tensor] = None,
+        causal: bool = False,
+        need_weights: bool = True,
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        """
+        支持自注意力：forward(x, x, x, ...)
+        支持交叉注意力：forward(q, k, v, ...)
+        attn_mask:
+            - 若为布尔或0/1张量，形状可为 [B, 1, Tq, Tk] 或 [1, 1, Tq, Tk]
+            - True/1 表示可见，False/0 表示mask
+            - 也可传 float，mask处为 -inf（将被加到score上）
+        causal:
+            - 若 True，自动叠加上三角因果mask (仅允许看历史)
+        """
+        if key is None:   key = query
+        if value is None: value = key
 
-        Q = self.w_q(query).view(B,-1,self.num_heads,self.d_head).transpose(1,2) #把后两维变为长度*d_head
-        K = self.w_k(key).view(B,-1,self.num_heads,self.d_head).transpose(1,2)
-        V = self.w_v(value).view(B,-1,self.num_heads,self.d_head).transpose(1,2)
+        B, Tq, _ = query.shape
+        Tk = key.size(1)
 
-        scores = torch.matmul(Q,K.transpose(-1,-2))/math.sqrt(self.d_head)  #[B, num_heads, Tq, Tk]
+        # 线性映射
+        Q = self._shape(self.w_q(query), B)  # [B, h, Tq, d_head]
+        K = self._shape(self.w_k(key),   B)  # [B, h, Tk, d_head]
+        V = self._shape(self.w_v(value), B)  # [B, h, Tk, d_head]
 
-        if casual:
-            casual_mask = torch.triu(
-                        torch.ones(Tq,Tk)，diagonal =1
-                        )
-            scores = scores.masked_fill(casual_mask , float("-inf"))
+        # 缩放点积注意力分数
+        # scores: [B, h, Tq, Tk]
+        scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(self.d_head)
 
-        attn  = F.softmax(scores,dim = -1)  # 将所有key做 softmax
+        # 叠加因果mask（上三角无效）
+        if causal:
+            # 上三角为True的位置应被mask；构造一个下三角保留的mask
+            causal_mask = torch.triu(
+                torch.ones(Tq, Tk, device=scores.device, dtype=torch.bool), diagonal=1
+            )  # [Tq, Tk]，上三角True
+            scores = scores.masked_fill(causal_mask, float("-inf"))
+
+        # 叠加外部attn_mask
+        if attn_mask is not None:
+            # 支持 bool/byte/float
+            if attn_mask.dtype == torch.bool:
+                # True=可见 -> 我们需要把不可见(False)处置为 -inf
+                scores = scores.masked_fill(~attn_mask, float("-inf"))
+            elif attn_mask.dtype in (torch.uint8, torch.int8, torch.int16, torch.int32, torch.int64):
+                scores = scores.masked_fill(attn_mask == 0, float("-inf"))
+            else:
+                # 视作 additive mask（同Transformer通用做法），直接加上去
+                scores = scores + attn_mask
+
+        # softmax -> 注意力
+        attn = F.softmax(scores, dim=-1)
         attn = self.attn_dropout(attn)
 
-        out = torch.matmul(attn, V)  # Tq, Tk* Tk, d_head = B, num_heads, Tq,  d_head
+        # 加权求和
+        out = torch.matmul(attn, V)  # [B, h, Tq, d_head]
 
-        out = out.transpose(1, 2).contiguous().view(B, Tq, self.d_model)  # B, Tq, num_heads, d_head
+        # 合并头
+        out = out.transpose(1, 2).contiguous().view(B, Tq, self.d_model)  # [B, Tq, d_model]
 
-        out = self.wo(out)
+        # 输出映射
+        out = self.w_o(out)
         out = self.proj_dropout(out)
 
-        return (out,attn) 
-        
+        return (out, attn) if need_weights else (out, None)
+
+# ------------- 简单自测 -------------
+if __name__ == "__main__":
+    torch.manual_seed(0)
+    B, Tq, Tk, d_model, h = 2, 5, 5, 64, 8
+    x = torch.randn(B, Tq, d_model)
+
+    mha = MultiHeadAttention(d_model=d_model, num_heads=h, dropout=0.1)
+    # 自注意力
+    y, attn = mha(x, x, x, causal=True, need_weights=True)
+    print("out:", y.shape)        # [2, 5, 64]
+    print("attn:", attn.shape)    # [2, 8, 5, 5]
 
 ```
 ---
@@ -204,4 +284,35 @@ def focal_loss(pred, gt, alpha=2, beta=4):
     num_pos = pos_mask.sum()
     loss = (pos_loss.sum() + neg_loss.sum()) / torch.clamp(num_pos, min=1.0)
     return loss
+```
+在检测/分割里，负样本通常很多，如果不归一化，loss 会被负样本主导。
+
+== 才是比较，不能写成 =
+
+变量名不能用 .
+
+log 要加 1e-6 防止数值溢出
+
+分母加 1e-6 防止除零
+
+
+# BCE
+```
+def bce(gt,pred):
+    loss = - ( gt * torch.log(pred) +(1-gt) * torch.log(1-pred))
+    return loss.mean()
+```
+# CE
+
+```
+def categorical_CE(gt, pred):
+    """
+    gt:   [N] 真实类别索引 (int)
+    pred: [N, C] 模型输出的 logits
+    """
+    eps = 1e-6
+    probs = torch.softmax(pred, dim=1)                  # [N, C]
+    target_probs = probs[torch.arange(len(gt)), gt]     # 取真实类别的概率
+    loss = - torch.log(target_probs + eps)
+    return loss.mean()
 ```
