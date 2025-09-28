@@ -1,5 +1,6 @@
 # coding
 
+
 transpose(1,2) 是一种更简洁的写法，只能交换两个维度。
 
 permute(0,2,1,3) 可以同时调整多个维度，写法更通用
@@ -37,6 +38,25 @@ scores =
 ```
 scores[2,3],dim = -1 对应 3 , 那就将每行三个softmax
 
+---
+## MLP
+
+```
+class MLP(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.layers = nn.Sequential(
+            nn.Linear(5, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, 1)
+        )
+
+    def forward(self, x):
+        return self.layers(x)
+```
+---
 
 **Multihead attention**
 
