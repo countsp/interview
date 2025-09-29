@@ -261,7 +261,50 @@ def nms_per_class(boxes, scores, labels, iou_thr=0.5):
     # 可按分数再整体排序
     return sorted(keep_all, key=lambda i: scores[i], reverse=True)
 ```
+```
 
+float iou(vector<float>&a ,vector<float>&b) //x,y,w,h,s
+{
+    float x1 = a[0], y1 = a[1], w1 = a[2], h1 = a[3];
+    float x2 = b[0], y2 = b[1], w2 = b[2], h2 = b[3];
+
+    float inter_w = min(x1 + w1,x2 + w2)-max( x1,x2 );
+    float inter_h = min(y1 + h1,y2 + h2)-max( y1,y2 );
+
+    float inter_area = inter_x * inter_y;
+
+    if (inter_w <= 0 || inter_h <= 0) return 0.0f;
+
+    float uni = w1 * h1 + w2 * h2 - inter;
+
+    return inter / uni;
+}
+
+vector<vector<float>> nms(vector<vector<float>>& preds, float thres) {
+    sort(preds.begin(),preds.end(),[](vector<float>& a ,vector<float> &b ){return a[4]>b[4];}) ;//x,y,w,h,a
+    
+    vector<vector<float>> keep;
+
+    while(!preds.empty())
+    {
+        vector<float>curr = preds[0];
+        keep.push_back(curr);
+        preds.erase(preds.begin());
+
+        for (auto it = preds.begin() + 1; it != preds.end(); )
+        {
+            if (iou(curr, *it) > thres){it = preds.erase(it); } // 删除并返回下一个
+        }
+        else{
+            ++it;
+        }
+
+    }
+    return keep;
+}
+
+
+```
 
 **Softmax**
 ```
