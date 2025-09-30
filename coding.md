@@ -79,6 +79,17 @@ class MLP(nn.Module):
 
 **Multihead attention**
 
+import torch.nn.functional as F
+
+class MultiHeadAttn(nn.Module):
+
+score = torch.matmul(Q,K.transpose(-1,-2)) / (d_head **0.5)
+
+causal_mask = torch.triu(
+                torch.ones(Tq, Tk, device=scores.device, dtype=torch.bool), diagonal=1
+            )  # [Tq, Tk]，上三角True
+            scores = scores.masked_fill(causal_mask, float("-inf"))
+            
 ```
 import math
 from typing import Optional, Tuple
