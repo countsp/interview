@@ -13,8 +13,19 @@ x.size() == x.shape
 masked_fill(mask, value) 会把 mask=True 的位置替换成指定值（这里是 -inf）
 
 ---
+**softmax**
 
 attn  = F.softmax(scores,dim = -1)  # 数dim对应的值的行/列，所有元素softmax
+
+
+```
+scores =
+[[1.0, 2.0, 3.0],   # query1 对 key1~3 的分数
+ [4.0, 5.0, 6.0]]   # query2 对 key1~3 的分数
+
+```
+scores[2,3],dim = -1 对应 3 , 那就将每行三个softmax
+
 
 ---
 
@@ -44,14 +55,7 @@ out = out.transpose(1, 2).contiguous().view(B, Tq, self.d_model)
 
 ```
 
-softmax
-```
-scores =
-[[1.0, 2.0, 3.0],   # query1 对 key1~3 的分数
- [4.0, 5.0, 6.0]]   # query2 对 key1~3 的分数
 
-```
-scores[2,3],dim = -1 对应 3 , 那就将每行三个softmax
 
 ---
 ## MLP
