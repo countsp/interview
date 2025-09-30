@@ -16,7 +16,7 @@ masked_fill(mask, value) 会把 mask=True 的位置替换成指定值（这里�
 
 attn  = F.softmax(scores,dim = -1)  # 数dim对应的值的行/列，所有元素softmax
 
---
+---
 
 torch.stack
 
