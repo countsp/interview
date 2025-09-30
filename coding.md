@@ -11,6 +11,10 @@ masked_fill(mask, value) 会把 mask=True 的位置替换成指定值（这里�
 
 attn  = F.softmax(scores,dim = -1)  # 数dim对应的值的行/列，所有元素softmax
 
+torch.stack
+两个 tensor 形状必须完全一样，在新的维度上 堆叠 (stack) 张量。
+
+要求：所有输入 tensor 形状必须完全一样。
 
 causal_mask 需要放到设备上
 
