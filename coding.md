@@ -1,20 +1,30 @@
 # coding
 
-
 transpose(1,2) 是一种更简洁的写法，只能交换两个维度。
 
 permute(0,2,1,3) 可以同时调整多个维度，写法更通用
 
+---
+
 x.size() == x.shape
+
+---
 
 masked_fill(mask, value) 会把 mask=True 的位置替换成指定值（这里是 -inf）
 
+---
+
 attn  = F.softmax(scores,dim = -1)  # 数dim对应的值的行/列，所有元素softmax
 
+--
+
 torch.stack
+
 两个 tensor 形状必须完全一样，在新的维度上 堆叠 (stack) 张量。
 
 要求：所有输入 tensor 形状必须完全一样。
+
+---
 
 causal_mask 需要放到设备上
 
@@ -23,6 +33,7 @@ causal_mask = torch.triu(
     torch.ones(Tq, Tk, device=scores.device, dtype=torch.bool), diagonal=1
 )
 ```
+---
 
 在 PyTorch 里，张量的数据实际上是存放在一块连续的内存 buffer 里的。有些操作（比如 transpose, permute）不会真正移动数据，而是只改变「视图」(view)，通过 stride（步长）来改变索引方式。
 
