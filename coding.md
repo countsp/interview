@@ -379,3 +379,93 @@ def categorical_CE(gt, pred):
     loss = - torch.log(target_probs + eps)
     return loss.mean()
 ```
+# 二分类
+```
+  import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader
+from torchvision import datasets, transforms, models
+
+# ======================
+# 参数设置
+# ======================
+batch_size = 32
+num_epochs = 10
+learning_rate = 0.001
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# ======================
+# 数据加载
+# ======================
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+])
+
+train_dataset = datasets.ImageFolder("dataset/train", transform=transform)
+val_dataset   = datasets.ImageFolder("dataset/val", transform=transform)
+
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+val_loader   = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+# ======================
+# 模型定义（使用预训练ResNet18）
+# ======================
+model = models.resnet18(pretrained=True)
+model.fc = nn.Linear(model.fc.in_features, 2)  # 修改最后一层为二分类
+model = model.to(device)
+
+# ======================
+# 损失函数 & 优化器
+# ======================
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+# ======================
+# 训练 & 验证
+# ======================
+for epoch in range(num_epochs):
+    # ---- 训练 ----
+    model.train()
+    total_loss, correct, total = 0, 0, 0
+    for images, labels in train_loader:
+        images, labels = images.to(device), labels.to(device)
+
+        optimizer.zero_grad()
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+
+        total_loss += loss.item()
+        _, predicted = outputs.max(1)
+        correct += predicted.eq(labels).sum().item()
+        total += labels.size(0)
+
+    train_acc = 100 * correct / total
+    print(f"Epoch [{epoch+1}/{num_epochs}] "
+          f"Train Loss: {total_loss/len(train_loader):.4f}, "
+          f"Train Acc: {train_acc:.2f}%")
+
+    # ---- 验证 ----
+    model.eval()
+    correct, total = 0, 0
+    with torch.no_grad():
+        for images, labels in val_loader:
+            images, labels = images.to(device), labels.to(device)
+            outputs = model(images)
+            _, predicted = outputs.max(1)
+            correct += predicted.eq(labels).sum().item()
+            total += labels.size(0)
+
+    val_acc = 100 * correct / total
+    print(f"Validation Acc: {val_acc:.2f}%\n")
+
+# ======================
+# 保存模型
+# ======================
+torch.save(model.state_dict(), "binary_classification.pth")
+print("模型已保存：binary_classification.pth")
+```
